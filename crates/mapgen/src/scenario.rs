@@ -165,7 +165,7 @@ impl Scenario {
             world.player_mut(pid).age = p.age;
         }
         // Map scenario player slots (1..=8) to live player ids (only active ones exist).
-        let mut slot_to_pid = vec![PlayerId::GAIA; 9];
+        let mut slot_to_pid = [PlayerId::GAIA; 9];
         let mut next = 1u8;
         for (i, p) in self.players.iter().enumerate() {
             if p.active {
