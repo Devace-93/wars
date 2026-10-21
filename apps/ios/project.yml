@@ -27,7 +27,9 @@ targets:
           - "$(SRCROOT)/../../target/aarch64-apple-ios/release"
           - "$(SRCROOT)/../../target/aarch64-apple-ios-sim/release"
         OTHER_LDFLAGS:
-          - "-lwars_ffi"
+          # Link the static archive by path: with -l the linker would prefer the cdylib
+          # cargo also produces, which is not bundled with the app.
+          - "$(SRCROOT)/../../target/aarch64-apple-ios/release/libwars_ffi.a"
           - "-lc++"
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
