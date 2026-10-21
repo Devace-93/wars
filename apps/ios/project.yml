@@ -3,12 +3,12 @@ name: Wars
 options:
   bundleIdPrefix: net.m4
   deploymentTarget:
-    iOS: "15.0"
+    iOS: "16.0"
   createIntermediateGroups: true
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
     TARGETED_DEVICE_FAMILY: "1,2"
     ENABLE_BITCODE: NO
 targets:
@@ -36,3 +36,6 @@ targets:
       - sdk: QuartzCore.framework
       - sdk: UIKit.framework
       - sdk: Security.framework
+      - sdk: CoreGraphics.framework
+      - sdk: Foundation.framework
+      - sdk: CoreFoundation.framework
