@@ -15,3 +15,7 @@ serde = { workspace = true }
 [dev-dependencies]
 wars-data = { path = "../data" }
 wars-mapgen = { path = "../mapgen" }
+# Dev-only: the headless bot match and the integration tests drive `LocalMatch`.
+# wars-client depends on wars-ai as a normal dependency; a dev-dependency cycle is fine.
+wars-client = { path = "../client" }
+postcard = { workspace = true }

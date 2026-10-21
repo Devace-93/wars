@@ -2990,7 +2990,9 @@ dependencies = [
 name = "wars-ai"
 version = "0.1.0"
 dependencies = [
+ "postcard",
  "serde",
+ "wars-client",
  "wars-data",
  "wars-mapgen",
  "wars-sim",
