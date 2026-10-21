@@ -6,6 +6,18 @@ on:
 jobs:
   rust:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: wars
+          POSTGRES_PASSWORD: wars
+          POSTGRES_DB: wars
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U wars" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      WARS_TEST_DATABASE_URL: postgres://wars:wars@localhost:5432/wars
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
