@@ -8,4 +8,17 @@ repository.workspace = true
 [lints]
 workspace = true
 
+[[bin]]
+name = "wars"
+path = "src/main.rs"
+
 [dependencies]
+wars-app = { path = "../app", features = ["net"] }
+wars-render = { path = "../render" }
+wars-ui = { path = "../ui" }
+wars-mapgen = { path = "../mapgen" }
+wars-client = { path = "../client", features = ["net"] }
+wars-sim = { path = "../sim" }
+winit = { workspace = true }
+wgpu = { workspace = true }
+clap = { workspace = true }

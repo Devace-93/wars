@@ -245,6 +245,10 @@ impl Session {
             Session::Remote(m) => &mut m.world,
         }
     }
+    /// Mutable world access for the scenario editor (offline only).
+    pub fn world_mut_editor(&mut self) -> &mut World {
+        self.world_mut()
+    }
     pub fn me(&self) -> PlayerId {
         match self {
             Session::Local(m) => m.me,

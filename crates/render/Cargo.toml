@@ -9,3 +9,9 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
+wars-sim = { path = "../sim" }
+wgpu = { workspace = true }
+bytemuck = { workspace = true }
+fontdue = { workspace = true }
+raw-window-handle = "0.6"
+pollster = "0.4"
