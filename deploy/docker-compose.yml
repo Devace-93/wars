@@ -1,0 +1,39 @@
+# Local stack: Postgres + the server. `make up` builds and starts everything on :8086.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: wars
+      POSTGRES_PASSWORD: wars
+      POSTGRES_DB: wars
+    ports:
+      - "127.0.0.1:5486:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wars"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  server:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    environment:
+      DATABASE_URL: postgres://wars:wars@postgres:5432/wars
+      ACCOUNTS_URL: ${ACCOUNTS_URL:-https://accounts.3m4.net}
+      ACCOUNTS_INTERNAL_URL: ${ACCOUNTS_INTERNAL_URL:-https://accounts.3m4.net}
+      GUEST_SIGNING_KEY: ${GUEST_SIGNING_KEY:-dev-guest-key-change-me}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8086}
+      PORT: "8086"
+      RUST_LOG: ${RUST_LOG:-info}
+    ports:
+      - "127.0.0.1:8086:8086"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:

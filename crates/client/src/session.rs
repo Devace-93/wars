@@ -146,56 +146,73 @@ impl RemoteMatch {
     pub fn send(&mut self, msg: &ClientMsg) {
         self.transport.send(wars_proto::encode(msg));
     }
-    /// Drain the socket, then apply every batch that is ready. Returns events.
-    pub fn advance(&mut self, data: &GameData) -> Vec<Event> {
-        let mut events = Vec::new();
+    /// Drain the socket into the queue without stepping.
+    pub fn pump(&mut self) {
         while let Some(frame) = self.transport.try_recv() {
-            match wars_proto::decode::<ServerMsg>(&frame) {
-                Ok(ServerMsg::Tick { tick, commands }) => self.queue.push_back((tick, commands)),
-                Ok(ServerMsg::Snapshot { snapshot, .. }) => {
-                    if let Ok(w) = World::from_snapshot(&snapshot) {
-                        self.world = w;
-                        self.queue.retain(|(t, _)| *t > self.world.tick);
-                    }
-                }
-                Ok(ServerMsg::Desync { .. }) => self.desyncs += 1,
-                Ok(ServerMsg::Chat { name, text, .. }) => self.chat.push((name, text)),
-                Ok(ServerMsg::Paused(p)) => self.paused = p,
-                Ok(ServerMsg::SpeedChanged(s)) => self.tick_rate = TICKS_PER_SECOND * s / 100,
-                Ok(ServerMsg::MatchEnded { winner_team }) => self.ended = Some(winner_team),
-                Ok(ServerMsg::Pong { t }) => {
-                    let now = now_ms();
-                    self.last_rtt_ms = Some(now.saturating_sub(t));
-                }
-                Ok(ServerMsg::LobbyState(l)) => self.lobby = l,
-                Ok(ServerMsg::PlayerLeft { name, .. }) => self
-                    .chat
-                    .push(("system".into(), format!("{name} left the game"))),
-                _ => {}
-            }
+            self.handle_frame(frame);
         }
-        // Apply batches in order; catch up at most a few ticks per call to stay smooth.
-        let mut applied = 0;
-        let max = if self.queue.len() > 10 { 6 } else { 2 };
-        while applied < max {
-            let Some((tick, _)) = self.queue.front() else {
-                break;
-            };
-            if *tick != self.world.tick + 1 {
-                if *tick <= self.world.tick {
-                    self.queue.pop_front();
-                    continue;
+    }
+
+    fn handle_frame(&mut self, frame: Vec<u8>) {
+        match wars_proto::decode::<ServerMsg>(&frame) {
+            Ok(ServerMsg::Tick { tick, commands }) => self.queue.push_back((tick, commands)),
+            Ok(ServerMsg::Snapshot { snapshot, .. }) => {
+                if let Ok(w) = World::from_snapshot(&snapshot) {
+                    self.world = w;
+                    self.queue.retain(|(t, _)| *t > self.world.tick);
                 }
-                break;
+            }
+            Ok(ServerMsg::Desync { .. }) => self.desyncs += 1,
+            Ok(ServerMsg::Chat { name, text, .. }) => self.chat.push((name, text)),
+            Ok(ServerMsg::Paused(p)) => self.paused = p,
+            Ok(ServerMsg::SpeedChanged(s)) => self.tick_rate = TICKS_PER_SECOND * s / 100,
+            Ok(ServerMsg::MatchEnded { winner_team }) => self.ended = Some(winner_team),
+            Ok(ServerMsg::Pong { t }) => {
+                let now = now_ms();
+                self.last_rtt_ms = Some(now.saturating_sub(t));
+            }
+            Ok(ServerMsg::LobbyState(l)) => self.lobby = l,
+            Ok(ServerMsg::PlayerLeft { name, .. }) => self
+                .chat
+                .push(("system".into(), format!("{name} left the game"))),
+            Ok(ServerMsg::Error { message, .. }) => self.chat.push(("error".into(), message)),
+            _ => {}
+        }
+    }
+
+    /// Apply exactly one queued batch if the next tick is available. Returns its events.
+    pub fn advance_one(&mut self, data: &GameData) -> Option<Vec<Event>> {
+        loop {
+            let (tick, _) = self.queue.front()?;
+            if *tick <= self.world.tick {
+                self.queue.pop_front();
+                continue;
+            }
+            if *tick != self.world.tick + 1 {
+                return None;
             }
             let (_, cmds) = self.queue.pop_front().unwrap();
             wars_sim::step::step(&mut self.world, data, &cmds);
-            events.extend(self.world.events.iter().cloned());
-            applied += 1;
             if self.world.tick % HASH_INTERVAL == 0 {
                 let h = self.world.hash();
                 let t = self.world.tick;
                 self.send(&ClientMsg::Hash { tick: t, hash: h });
+            }
+            self.behind = self.queue.len();
+            return Some(self.world.events.clone());
+        }
+    }
+
+    /// Drain the socket, then apply the batches that are ready (a few per call to stay
+    /// smooth, more when far behind). Returns events.
+    pub fn advance(&mut self, data: &GameData) -> Vec<Event> {
+        self.pump();
+        let mut events = Vec::new();
+        let max = if self.queue.len() > 10 { 6 } else { 2 };
+        for _ in 0..max {
+            match self.advance_one(data) {
+                Some(ev) => events.extend(ev),
+                None => break,
             }
         }
         self.behind = self.queue.len();
