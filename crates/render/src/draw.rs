@@ -113,17 +113,19 @@ impl DrawList {
         self.batches.last_mut().unwrap()
     }
     pub fn push_tri(&mut self, a: Vertex, b: Vertex, c: Vertex) {
+        // Open (or extend) the batch before appending indices so a batch that starts
+        // here covers this primitive.
+        self.batch().index_count += 3;
         let base = self.verts.len() as u32;
         self.verts.extend_from_slice(&[a, b, c]);
         self.idx.extend_from_slice(&[base, base + 1, base + 2]);
-        self.batch().index_count += 3;
     }
     pub fn push_quad(&mut self, v: [Vertex; 4]) {
+        self.batch().index_count += 6;
         let base = self.verts.len() as u32;
         self.verts.extend_from_slice(&v);
         self.idx
             .extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
-        self.batch().index_count += 6;
     }
     pub fn rect(&mut self, x: f32, y: f32, w: f32, h: f32, c: Color) {
         let v = |px: f32, py: f32| Vertex {

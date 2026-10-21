@@ -1,0 +1,38 @@
+name: ios
+on:
+  push:
+    branches: [main]
+    paths: ["crates/**", "apps/ios/**", ".github/workflows/ios.yml", "Cargo.*"]
+  workflow_dispatch:
+jobs:
+  ipa:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the Rust engine for iOS
+        run: cargo build --release -p wars-ffi --target aarch64-apple-ios
+      - name: Generate the Xcode project
+        run: |
+          brew install xcodegen
+          cd apps/ios && xcodegen generate
+      - name: Build the unsigned app
+        run: |
+          cd apps/ios
+          xcodebuild -project Wars.xcodeproj -scheme Wars -configuration Release -sdk iphoneos \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            ONLY_ACTIVE_ARCH=YES ARCHS=arm64 build
+      - name: Package the IPA
+        run: |
+          cd apps/ios
+          rm -rf Payload && mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/Wars.app Payload/
+          zip -qr wars-ios.ipa Payload
+          ls -la wars-ios.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wars-ios
+          path: apps/ios/wars-ios.ipa

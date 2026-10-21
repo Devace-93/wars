@@ -8,4 +8,25 @@ repository.workspace = true
 [lints]
 workspace = true
 
+[lib]
+name = "wars_ffi"
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[features]
+default = ["net"]
+net = ["wars-app/net"]
+
 [dependencies]
+wars-app = { path = "../app" }
+wars-render = { path = "../render" }
+wars-ui = { path = "../ui" }
+wars-client = { path = "../client" }
+wgpu = { workspace = true }
+raw-window-handle = "0.6"
+log = "0.4"
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+ndk = { version = "0.9", features = ["api-level-26"] }
+ndk-sys = "0.6"
+android_logger = "0.14"

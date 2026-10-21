@@ -1,0 +1,63 @@
+name: desktop-builds
+on:
+  push:
+    branches: [main]
+    paths: ["crates/**", ".github/workflows/release.yml", "Cargo.*"]
+  workflow_dispatch:
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-x86_64
+            ext: ""
+          - os: windows-latest
+            name: windows-x86_64
+            ext: ".exe"
+          - os: macos-14
+            name: macos-arm64
+            ext: ""
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libasound2-dev pkg-config
+      - run: cargo build --release -p wars-desktop -p wars-tui -p wars-server
+      - name: Collect
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp target/release/wars${{ matrix.ext }} dist/
+          cp target/release/wars-tui${{ matrix.ext }} dist/
+          cp target/release/wars-server${{ matrix.ext }} dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wars-${{ matrix.name }}
+          path: dist/*
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "ndk;27.2.12479018" "platforms;android-35" "build-tools;35.0.0"
+      - run: cargo install cargo-ndk
+      - run: cargo ndk -t arm64-v8a --platform 26 -o apps/android/app/src/main/jniLibs build --release -p wars-ffi
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
+      - run: cd apps/android && ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wars-android-debug
+          path: apps/android/app/build/outputs/apk/debug/app-debug.apk
