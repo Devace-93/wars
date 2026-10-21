@@ -16,11 +16,10 @@ cd /opt/3m4 && git pull && docker compose -f deploy/docker-compose.yml -f deploy
 
 Check: `curl https://wars.3m4.net/healthz` → `{"status":"ok"}` (after DNS below).
 
-## 2. DNS at Bluehost (2 minutes, needs your login)
+## 2. DNS at Bluehost — done
 
-Tell me "do the DNS thing: wars → 46.225.62.18" and log in to Bluehost in the browser
-window I open; the `bluehost-subdomain` skill adds the `wars` A record. (I could not do
-it overnight because the panel needs your session.)
+`wars.3m4.net` A → `46.225.62.18` (TTL 15 min) was added on 2026-10-21 and already
+answers from ns1/ns2.bluehost.com and Google DNS. Nothing to do.
 
 ## 3. Deploy on push (optional, 3 minutes)
 
