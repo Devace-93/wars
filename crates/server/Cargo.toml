@@ -9,3 +9,30 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
+wars-sim = { path = "../sim" }
+wars-data = { path = "../data" }
+wars-mapgen = { path = "../mapgen" }
+wars-proto = { path = "../proto" }
+wars-ai = { path = "../ai" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+postcard = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+sqlx = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+reqwest = { workspace = true }
+jsonwebtoken = { workspace = true }
+futures-util = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+base64 = "0.22"
+sha2 = "0.10"
+hmac = "0.12"
+
+[dev-dependencies]
+wars-client = { path = "../client", features = ["net"] }
+ureq = { version = "2", features = ["json"] }

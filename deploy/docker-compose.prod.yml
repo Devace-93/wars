@@ -1,0 +1,17 @@
+# Production overrides: wars shares the Hetzner box with the other 3m4 apps. The 3m4
+# edge Caddy owns 80/443 and routes wars.3m4.net to `wars-server-1:8086` over the
+# external `edge` network, so no ports are published here.
+#
+#   docker network create edge            # once per server (already exists for exp)
+#   cd /opt/wars/deploy
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+services:
+  postgres:
+    ports: []
+  server:
+    ports: []
+    networks: [default, edge]
+
+networks:
+  edge:
+    external: true
