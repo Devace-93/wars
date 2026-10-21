@@ -11,7 +11,10 @@ use wars_sim::{Fixed, Vec2};
 fn setup() -> (World, &'static GameData) {
     let data = wars_data::data();
     let map = Map::new(40, 40, Terrain::Grass);
-    let settings = Settings { allow_cheats: true, ..Settings::default() };
+    let settings = Settings {
+        allow_cheats: true,
+        ..Settings::default()
+    };
     let mut w = World::new(map, 42, settings);
     w.add_player("Gaia", CivId(0), 0, false, Stockpile::ZERO);
     w.add_player(
