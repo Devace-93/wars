@@ -1,0 +1,12 @@
+/target
+**/*.rs.bk
+.env
+*.log
+/apps/android/.gradle
+/apps/android/build
+/apps/android/**/build
+/apps/android/local.properties
+/apps/ios/*.xcodeproj
+/apps/ios/build
+/apps/ios/WarsCore.xcframework
+.DS_Store
