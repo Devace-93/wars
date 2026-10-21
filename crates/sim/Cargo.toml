@@ -6,3 +6,10 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+serde = { workspace = true }
+postcard = { workspace = true }
+rand_xoshiro = { workspace = true }
+rand_core = { workspace = true }
+
+[dev-dependencies]
+wars-data = { path = "../data" }
