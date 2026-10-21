@@ -142,6 +142,14 @@ pub fn apply_command(world: &mut World, data: &GameData, player: PlayerId, cmd: 
             for id in own_units(world, player, units) {
                 let e = world.get(id).unwrap();
                 let def = data.object(e.ty);
+                // Monks sent at a relic pick it up.
+                let tdef = data.object(world.get(*target).unwrap().ty);
+                if tdef.class == ObjectClass::Relic {
+                    if def.can_convert {
+                        set_task(world, id, Task::PickRelic { target: *target }, *queue);
+                    }
+                    continue;
+                }
                 if def.attacks.is_empty() {
                     continue;
                 }

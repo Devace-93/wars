@@ -6,3 +6,9 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+wars-sim = { path = "../sim" }
+serde = { workspace = true }
+
+[dev-dependencies]
+wars-data = { path = "../data" }
+wars-mapgen = { path = "../mapgen" }

@@ -5,4 +5,21 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+default = []
+# Blocking WebSocket + HTTP transport for desktop/console (std threads).
+net = ["dep:tungstenite", "dep:ureq", "dep:url"]
+
 [dependencies]
+wars-sim = { path = "../sim" }
+wars-data = { path = "../data" }
+wars-mapgen = { path = "../mapgen" }
+wars-proto = { path = "../proto" }
+wars-ai = { path = "../ai" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+postcard = { workspace = true }
+directories = { workspace = true }
+tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"], optional = true }
+ureq = { version = "2", features = ["json"], optional = true }
+url = { version = "2", optional = true }
