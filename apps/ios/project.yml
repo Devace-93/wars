@@ -1,0 +1,38 @@
+# XcodeGen spec. `xcodegen generate` produces Wars.xcodeproj (the workflow does it).
+name: Wars
+options:
+  bundleIdPrefix: net.m4
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    ENABLE_BITCODE: NO
+targets:
+  Wars:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: net.m4.wars
+        INFOPLIST_FILE: Resources/Info.plist
+        SWIFT_OBJC_BRIDGING_HEADER: Sources/Wars-Bridging-Header.h
+        LIBRARY_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(SRCROOT)/../../target/aarch64-apple-ios/release"
+          - "$(SRCROOT)/../../target/aarch64-apple-ios-sim/release"
+        OTHER_LDFLAGS:
+          - "-lwars_ffi"
+          - "-lc++"
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+    dependencies:
+      - sdk: Metal.framework
+      - sdk: QuartzCore.framework
+      - sdk: UIKit.framework
+      - sdk: Security.framework

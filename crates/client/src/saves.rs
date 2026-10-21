@@ -3,7 +3,19 @@
 use std::path::PathBuf;
 use wars_sim::world::World;
 
+static OVERRIDE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// Mobile shells point the data dir at the app's private files directory.
+pub fn set_data_dir(p: PathBuf) {
+    let _ = OVERRIDE.set(p);
+}
+
 pub fn data_dir() -> PathBuf {
+    if let Some(p) = OVERRIDE.get() {
+        let _ = std::fs::create_dir_all(p.join("saves"));
+        let _ = std::fs::create_dir_all(p.join("scenarios"));
+        return p.clone();
+    }
     if let Some(d) = directories::ProjectDirs::from("net", "3m4", "wars") {
         let p = d.data_dir().to_path_buf();
         let _ = std::fs::create_dir_all(p.join("saves"));

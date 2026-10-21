@@ -16,6 +16,8 @@ pub struct Renderer {
     ibuf: wgpu::Buffer,
     vcap: usize,
     icap: usize,
+    /// Logical-to-physical pixel scale (UI scale on phones).
+    pub scale: f32,
 }
 
 const SHADER: &str = r#"
@@ -252,6 +254,7 @@ impl Renderer {
             ibuf,
             vcap,
             icap,
+            scale: 1.0,
         })
     }
 
@@ -264,8 +267,16 @@ impl Renderer {
         self.surface.configure(&self.device, &self.config);
     }
 
+    /// Physical surface size.
     pub fn size(&self) -> (f32, f32) {
         (self.config.width as f32, self.config.height as f32)
+    }
+    /// Logical size the app draws in (physical / scale).
+    pub fn logical_size(&self) -> (f32, f32) {
+        (
+            self.config.width as f32 / self.scale,
+            self.config.height as f32 / self.scale,
+        )
     }
 
     fn upload(&mut self, dl: &DrawList, text: &mut TextSystem) {
@@ -315,7 +326,7 @@ impl Renderer {
             self.queue
                 .write_buffer(&self.ibuf, 0, bytemuck::cast_slice(&dl.idx));
         }
-        let (w, h) = self.size();
+        let (w, h) = self.logical_size();
         self.queue
             .write_buffer(&self.uniform, 0, bytemuck::cast_slice(&[w, h, 0.0, 0.0]));
     }
@@ -369,16 +380,23 @@ impl Renderer {
         pass.set_vertex_buffer(0, self.vbuf.slice(..));
         pass.set_index_buffer(self.ibuf.slice(..), wgpu::IndexFormat::Uint32);
         let (sw, sh) = (self.config.width as i32, self.config.height as i32);
+        let k = self.scale;
         for b in &dl.batches {
             if b.index_count == 0 {
                 continue;
             }
             match b.clip {
                 Some(c) => {
-                    let x = c.x.clamp(0, sw);
-                    let y = c.y.clamp(0, sh);
-                    let w = (c.x + c.w).clamp(0, sw) - x;
-                    let h = (c.y + c.h).clamp(0, sh) - y;
+                    let (cx, cy, cw, ch) = (
+                        (c.x as f32 * k) as i32,
+                        (c.y as f32 * k) as i32,
+                        (c.w as f32 * k).ceil() as i32,
+                        (c.h as f32 * k).ceil() as i32,
+                    );
+                    let x = cx.clamp(0, sw);
+                    let y = cy.clamp(0, sh);
+                    let w = (cx + cw).clamp(0, sw) - x;
+                    let h = (cy + ch).clamp(0, sh) - y;
                     if w <= 0 || h <= 0 {
                         continue;
                     }

@@ -223,14 +223,21 @@ pub fn frame(app: &mut App) {
                 );
             }
             Screen::SinglePlayer => {
-                ui.heading(40.0, 30.0, "Single player");
+                ui.heading(40.0, 20.0, "Single player");
+                let compact = h < 620.0;
                 let x = 40.0;
-                let cw = (w - 120.0).min(640.0);
-                let mut y = 80.0;
-                let row = 36.0;
+                let cw = if compact {
+                    (w / 2.0 - 60.0).min(520.0)
+                } else {
+                    (w - 120.0).min(640.0)
+                };
+                let x2 = if compact { w / 2.0 + 10.0 } else { x };
+                let mut y = 60.0;
+                let row = if compact { 32.0 } else { 36.0 };
+                let fh = row - 6.0;
                 ui.text_field(
                     wars_ui::id("pname"),
-                    Rect::new(x, y, cw, 30.0),
+                    Rect::new(x, y, cw, fh),
                     "Your name",
                     &mut menu.player_name,
                     "Player",
@@ -239,7 +246,7 @@ pub fn frame(app: &mut App) {
                 y += row;
                 let civ_names: Vec<String> = data.civs.iter().map(|c| c.name.clone()).collect();
                 ui.select(
-                    Rect::new(x, y, cw, 30.0),
+                    Rect::new(x, y, cw, fh),
                     "Civilisation",
                     &civ_names[menu.civ % civ_names.len()],
                     &mut menu.civ,
@@ -248,19 +255,19 @@ pub fn frame(app: &mut App) {
                 y += row;
                 let desc = &data.civs[menu.civ % civ_names.len()];
                 ui.label_dim(x + 150.0, y, &desc.description);
-                y += 22.0;
-                for (i, b) in desc.bonus_text.iter().enumerate().take(4) {
+                y += 20.0;
+                for (i, b) in desc.bonus_text.iter().enumerate().take(3) {
                     ui.label_color(
                         x + 150.0,
-                        y + i as f32 * 16.0,
+                        y + i as f32 * 15.0,
                         12,
                         &format!("· {b}"),
                         THEME.text_dim,
                     );
                 }
-                y += 70.0;
+                y += 52.0;
                 ui.select(
-                    Rect::new(x, y, cw, 30.0),
+                    Rect::new(x, y, cw, fh),
                     "Map",
                     MapType::ALL[menu.map_type % 6].name(),
                     &mut menu.map_type,
@@ -268,7 +275,7 @@ pub fn frame(app: &mut App) {
                 );
                 y += row;
                 ui.select(
-                    Rect::new(x, y, cw, 30.0),
+                    Rect::new(x, y, cw, fh),
                     "Size",
                     &format!(
                         "{} ({} tiles)",
@@ -280,7 +287,7 @@ pub fn frame(app: &mut App) {
                 );
                 y += row;
                 ui.select(
-                    Rect::new(x, y, cw, 30.0),
+                    Rect::new(x, y, cw, fh),
                     "Opponents",
                     &format!("{}", menu.opponents),
                     &mut menu.opponents,
@@ -291,71 +298,73 @@ pub fn frame(app: &mut App) {
                 }
                 y += row;
                 ui.select(
-                    Rect::new(x, y, cw, 30.0),
+                    Rect::new(x, y, cw, fh),
                     "AI level",
                     ["Easy", "Standard", "Hard"][menu.ai_level % 3],
                     &mut menu.ai_level,
                     3,
                 );
                 y += row;
+                let mut y2 = if compact { 60.0 } else { y };
                 ui.select(
-                    Rect::new(x, y, cw, 30.0),
+                    Rect::new(x2, y2, cw, fh),
                     "Game mode",
                     ["Random map", "Deathmatch", "Regicide"][menu.mode % 3],
                     &mut menu.mode,
                     3,
                 );
-                y += row;
+                y2 += row;
                 ui.select(
-                    Rect::new(x, y, cw, 30.0),
+                    Rect::new(x2, y2, cw, fh),
                     "Starting age",
                     Age::ALL[menu.start_age % 4].name(),
                     &mut menu.start_age,
                     4,
                 );
-                y += row;
+                y2 += row;
                 ui.select(
-                    Rect::new(x, y, cw, 30.0),
+                    Rect::new(x2, y2, cw, fh),
                     "Victory",
                     ["Standard", "Conquest", "Score at 30 min"][menu.victory % 3],
                     &mut menu.victory,
                     3,
                 );
-                y += row;
+                y2 += row;
                 ui.checkbox(
-                    Rect::new(x, y, 200.0, 26.0),
-                    "All opponents in one team",
+                    Rect::new(x2, y2, 200.0, 26.0),
+                    "Opponents in one team",
                     &mut menu.teams,
                 );
+                y2 += row;
                 ui.checkbox(
-                    Rect::new(x + 220.0, y, 160.0, 26.0),
+                    Rect::new(x2, y2, 160.0, 26.0),
                     "Reveal map",
                     &mut menu.reveal,
                 );
                 ui.checkbox(
-                    Rect::new(x + 400.0, y, 160.0, 26.0),
+                    Rect::new(x2 + 180.0, y2, 160.0, 26.0),
                     "Allow cheats",
                     &mut menu.cheats,
                 );
-                y += row;
+                y2 += row;
                 ui.text_field(
                     wars_ui::id("seed"),
-                    Rect::new(x, y, cw, 30.0),
+                    Rect::new(x2, y2, cw, fh),
                     "Seed (optional)",
                     &mut menu.seed,
                     "random",
                     false,
                 );
-                y += row + 10.0;
+                y2 += row + 8.0;
                 if ui.button_styled(
-                    Rect::new(x, y, 200.0, 40.0),
+                    Rect::new(x2, y2, 200.0, 40.0),
                     "Start game",
                     true,
                     THEME.accent_dark,
                 ) {
                     action = Some("start");
                 }
-                if ui.button(Rect::new(x + 220.0, y, 120.0, 40.0), "Back") {
+                if ui.button(Rect::new(x2 + 220.0, y2, 120.0, 40.0), "Back") {
                     next = Some(Screen::Main);
                 }
             }
