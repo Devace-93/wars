@@ -78,7 +78,7 @@ class GameView(context: Context, private val onQuit: () -> Unit) : SurfaceView(c
     private fun scale(): Float {
         // UI scale: ~2.0 on a typical phone so the 52 px command cells become ~40 dp.
         val dpi = resources.displayMetrics.densityDpi
-        return (dpi / 200f).coerceIn(1.2f, 3.0f)
+        return (dpi / 240f).coerceIn(1.2f, 2.4f)
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
