@@ -345,7 +345,7 @@ impl<'a> Gen<'a> {
             if !map.in_bounds(px, py) || !visited.insert((px, py)) {
                 continue;
             }
-            if !over.contains(&map.terrain(px, py)) {
+            if !over.contains(&map.terrain(px, py)) || map.occupant(px, py).is_some() {
                 continue;
             }
             map.set_terrain(px, py, t);
