@@ -31,7 +31,9 @@ jobs:
           rm -rf Payload && mkdir Payload
           cp -R build/Build/Products/Release-iphoneos/Wars.app Payload/
           zip -qr wars-ios.ipa Payload
-          ls -la wars-ios.ipa
+          ls -la wars-ios.ipa Payload/Wars.app/Wars
+          # The engine must be inside: a tiny binary means the static archive was not linked.
+          test "$(stat -f%z Payload/Wars.app/Wars)" -gt 5000000
       - uses: actions/upload-artifact@v4
         with:
           name: wars-ios
