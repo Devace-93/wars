@@ -169,7 +169,7 @@ fn resource(key: &str, name: &str, kind: GatherKind, amount: i32, glyph: char) -
         value: 0,
     });
     o.glyph = glyph;
-    o.placement = Placement::Any;
+    o.placement = Placement::Land;
     o
 }
 
@@ -2253,9 +2253,11 @@ pub fn objects() -> Vec<ObjectType> {
     let mut o = resource("tree", "Tree", GatherKind::Wood, 100, 'T');
     cls(&mut o, C::Tree);
     o.glyph = '♣';
+    o.placement = Placement::Any;
     v.push(o);
     let mut o = resource("pine", "Pine Tree", GatherKind::Wood, 100, '♠');
     cls(&mut o, C::Tree);
+    o.placement = Placement::Any;
     v.push(o);
     let mut o = resource("gold_mine", "Gold Mine", GatherKind::Gold, 800, '$');
     o.art = 1;
@@ -2275,7 +2277,7 @@ pub fn objects() -> Vec<ObjectType> {
     let mut o = base("relic", "Relic", ObjectClass::Relic, Role::None);
     o.hp = 1;
     o.glyph = '†';
-    o.placement = Placement::Any;
+    o.placement = Placement::Land;
     v.push(o);
 
     fn animal(
