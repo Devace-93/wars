@@ -185,6 +185,11 @@ impl App {
         }
     }
 
+    /// Latest cursor position (before the next frame snapshot).
+    pub fn mouse(&self) -> (f32, f32) {
+        self.mouse
+    }
+
     pub fn toast(&mut self, s: impl Into<String>) {
         self.toasts.push((s.into(), self.time + 5.0));
     }

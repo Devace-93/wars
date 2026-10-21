@@ -328,7 +328,52 @@ impl<'a> Ui<'a> {
         } else {
             THEME.button
         };
-        self.button_styled(r, label, enabled, base)
+        let hot = enabled && self.hover(r);
+        let down = hot && self.frame.down;
+        let c = if !enabled {
+            base.mul(0.6)
+        } else if down {
+            THEME.button_down
+        } else if hot {
+            THEME.button_hot
+        } else {
+            base
+        };
+        self.dl.rect(r.x, r.y, r.w, r.h, c);
+        self.dl.rect_outline(
+            r.x,
+            r.y,
+            r.w,
+            r.h,
+            1.5,
+            if hot {
+                THEME.accent
+            } else {
+                THEME.panel_border
+            },
+        );
+        let tc = if enabled { THEME.text } else { THEME.text_dim };
+        // Fit the label: shrink the font until it fits, then clip.
+        let mut size = 13u32;
+        while size > 9 && self.text.measure(Font::Regular, size, label) > r.w - 6.0 {
+            size -= 1;
+        }
+        self.dl.set_clip(Some(r.inset(1.0).clip()));
+        self.text.draw_centered(
+            self.dl,
+            Font::Regular,
+            size,
+            r.x + r.w / 2.0,
+            r.y + (r.h - size as f32 * 1.1) / 2.0 + 4.0,
+            label,
+            tc,
+        );
+        self.dl.set_clip(None);
+        let clicked = hot && self.frame.released;
+        if clicked {
+            self.consumed_click = true;
+        }
+        clicked
     }
     pub fn checkbox(&mut self, r: Rect, label: &str, v: &mut bool) -> bool {
         let hot = self.hover(r);

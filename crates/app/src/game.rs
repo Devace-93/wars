@@ -707,7 +707,7 @@ pub fn map_input(app: &mut App, ui_consumed: bool) {
                             acts.push(Act::Select(ids, shift));
                         }
                     } else if on_map {
-                        let picked = Controller::pick(world, data, at, me);
+                        let picked = pick_screen(world, data, &iso, f.mouse.0, f.mouse.1, me);
                         let dbl = time - g.last_click.0 < 0.35
                             && (g.last_click.1 .0 - f.mouse.0).abs() < 6.0
                             && (g.last_click.1 .1 - f.mouse.1).abs() < 6.0;
@@ -733,7 +733,7 @@ pub fn map_input(app: &mut App, ui_consumed: bool) {
                 }
             }
             if on_map && f.right_released {
-                let target = Controller::pick(world, data, at, me);
+                let target = pick_screen(world, data, &iso, f.mouse.0, f.mouse.1, me);
                 if let Some(cmd) = ctrl.context_command(world, data, me, at, target) {
                     acts.push(Act::Issue(cmd));
                 }
@@ -764,6 +764,56 @@ pub fn map_input(app: &mut App, ui_consumed: bool) {
             Act::WallStart(x, y) => g.wall_start = if x == i32::MIN { None } else { Some((x, y)) },
         }
     }
+}
+
+/// Pick the entity under a screen point: units by their sprite box, then buildings by
+/// footprint. Own units win ties so a click next to a building still grabs the villager.
+pub fn pick_screen(
+    world: &World,
+    data: &GameData,
+    iso: &Iso,
+    sx: f32,
+    sy: f32,
+    viewer: PlayerId,
+) -> Option<EntityId> {
+    let z = iso.zoom;
+    let mut best: Option<(i32, f32, EntityId)> = None;
+    if std::env::var("WARS_DEBUG_PICK").is_ok() {
+        for e in world.entities_of(viewer) {
+            let (ex, ey) = iso.to_screen(e.pos.x.to_f32(), e.pos.y.to_f32());
+            eprintln!(
+                "pick at {sx},{sy}: {} at {ex:.0},{ey:.0}",
+                data.object(e.ty).key
+            );
+        }
+    }
+    for e in world.visible_entities(viewer) {
+        let def = data.object(e.ty);
+        if e.inside.is_some() {
+            continue;
+        }
+        if matches!(def.class, ObjectClass::Unit | ObjectClass::Animal) {
+            let (ex, ey) = iso.to_screen(e.pos.x.to_f32(), e.pos.y.to_f32());
+            let dx = (sx - ex).abs();
+            let dy = sy - ey;
+            if dx <= 11.0 * z + 3.0 && dy <= 5.0 * z + 2.0 && dy >= -26.0 * z - 2.0 {
+                let prio = if e.owner == viewer { 0 } else { 1 };
+                let d = dx + (dy + 12.0 * z).abs();
+                if best.map(|(bp, bd, _)| (prio, d) < (bp, bd)).unwrap_or(true) {
+                    best = Some((prio, d, e.id));
+                }
+            }
+        }
+    }
+    if best.is_some() {
+        return best.map(|(_, _, id)| id);
+    }
+    let (wx, wy) = iso.to_world(sx, sy);
+    let at = Vec2::new(
+        Fixed::from_decimal(&format!("{:.3}", wx.max(0.0))),
+        Fixed::from_decimal(&format!("{:.3}", wy.max(0.0))),
+    );
+    Controller::pick(world, data, at, viewer)
 }
 
 pub fn select_all_of_type(g: &mut GameState, id: EntityId, data: &GameData) {

@@ -64,7 +64,7 @@ fn cost_str(c: &Stockpile) -> String {
 }
 
 fn short(name: &str) -> String {
-    if name.len() <= 11 {
+    if name.len() <= 8 {
         return name.to_string();
     }
     let words: Vec<&str> = name.split(' ').collect();
@@ -81,7 +81,7 @@ fn short(name: &str) -> String {
             );
         }
     }
-    name.chars().take(10).collect::<String>() + "."
+    name.chars().take(7).collect::<String>() + "."
 }
 
 /// Build the 15-cell command grid for the current selection.
@@ -344,7 +344,7 @@ fn grid_cells(g: &GameState, data: &GameData) -> Vec<Cell> {
                         .requires
                         .iter()
                         .any(|r| data.tech_id(r).map(|id| !p.has_tech(id)).unwrap_or(false));
-                    if prereq_missing && tdef.advances_to.is_none() {
+                    if prereq_missing {
                         continue;
                     }
                     let (cost, ticks) = stats::tech_cost(world, data, me, *t);

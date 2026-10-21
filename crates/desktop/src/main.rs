@@ -46,6 +46,8 @@ struct Shell {
     last: Instant,
     mods: Mods,
     frames: u32,
+    shot_pending: bool,
+    shot_n: u32,
 }
 
 fn key_of(code: KeyCode, text: Option<&str>) -> Option<Key> {
@@ -197,6 +199,9 @@ impl ApplicationHandler for Shell {
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 if let PhysicalKey::Code(code) = event.physical_key {
+                    if code == KeyCode::F12 && event.state == ElementState::Pressed {
+                        self.shot_pending = true;
+                    }
                     if let Some(k) = key_of(code, event.text.as_deref()) {
                         app.input(Input::Key {
                             key: k,
@@ -249,6 +254,22 @@ impl ApplicationHandler for Shell {
                         }
                     }
                 }
+                if self.shot_pending {
+                    self.shot_pending = false;
+                    self.shot_n += 1;
+                    let px =
+                        renderer.render_to_pixels(&app.dl, &mut app.text, [0.02, 0.015, 0.01, 1.0]);
+                    let (w, h) = renderer.size();
+                    let dir = wars_client::saves::data_dir().join("screenshots");
+                    let _ = std::fs::create_dir_all(&dir);
+                    let path = dir.join(format!("wars-{}-{}.png", std::process::id(), self.shot_n));
+                    if std::fs::write(&path, wars_render::gpu::encode_png(w as u32, h as u32, &px))
+                        .is_ok()
+                    {
+                        app.toast(format!("Screenshot saved: {}", path.display()));
+                        eprintln!("screenshot {}", path.display());
+                    }
+                }
                 match renderer.render(&app.dl, &mut app.text, [0.02, 0.015, 0.01, 1.0]) {
                     Ok(()) => {}
                     Err(wgpu::SurfaceError::Lost) | Err(wgpu::SurfaceError::Outdated) => {
@@ -274,7 +295,7 @@ impl ApplicationHandler for Shell {
 }
 
 fn mouse_pos(app: &App) -> (f32, f32) {
-    app.frame.mouse
+    app.mouse()
 }
 
 fn main() {
@@ -289,6 +310,8 @@ fn main() {
         last: Instant::now(),
         mods: Mods::default(),
         frames: 0,
+        shot_pending: false,
+        shot_n: 0,
     };
     event_loop.run_app(&mut shell).expect("run");
 }
