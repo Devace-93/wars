@@ -31,7 +31,7 @@ impl Identity {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct AccountsClaims {
     iss: String,
     aud: String,
@@ -125,6 +125,13 @@ impl Auth {
     }
 
     /// Verify either kind of token.
+    /// Inject verification keys (tests, or a pre-fetched JWKS).
+    pub fn set_keys(&self, keys: HashMap<String, DecodingKey>) {
+        if let Ok(mut w) = self.keys.write() {
+            *w = (Instant::now(), keys);
+        }
+    }
+
     pub async fn verify(&self, token: &str) -> Result<Identity, &'static str> {
         let header = jsonwebtoken::decode_header(token).map_err(|_| "invalid_session")?;
         match header.alg {
@@ -250,4 +257,89 @@ pub fn token_from_headers(headers: &axum::http::HeaderMap) -> Option<String> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use base64::Engine;
+    use ring::signature::{Ed25519KeyPair, KeyPair};
+
+    fn cfg() -> Config {
+        Config {
+            port: 0,
+            database_url: String::new(),
+            accounts_url: "https://accounts.3m4.net".into(),
+            accounts_internal_url: "http://127.0.0.1:1".into(),
+            guest_signing_key: "test-guest-key".into(),
+            public_url: String::new(),
+            version: "test".into(),
+        }
+    }
+
+    fn now() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    }
+
+    /// An accounts-style EdDSA session token signed by a fresh Ed25519 key, verified through
+    /// the JWKS path (jsonwebtoken 10, `from_ed_components`).
+    #[tokio::test]
+    async fn verifies_accounts_eddsa_session() {
+        let rng = ring::rand::SystemRandom::new();
+        let pkcs8 = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
+        let pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
+        let x = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(pair.public_key().as_ref());
+        let auth = Auth::new(&cfg());
+        let mut keys = HashMap::new();
+        keys.insert(
+            "kid1".to_string(),
+            DecodingKey::from_ed_components(&x).unwrap(),
+        );
+        auth.set_keys(keys);
+        let claims = AccountsClaims {
+            iss: "https://accounts.3m4.net".into(),
+            aud: "3m4".into(),
+            sub: "user-uuid".into(),
+            email_verified: Some(true),
+            handle: "ana".into(),
+            name: Some("Ana".into()),
+            avatar_url: None,
+            exp: now() + 600,
+        };
+        let mut header = Header::new(Algorithm::EdDSA);
+        header.kid = Some("kid1".into());
+        let token =
+            jsonwebtoken::encode(&header, &claims, &EncodingKey::from_ed_der(pkcs8.as_ref()))
+                .unwrap();
+        let id = auth.verify(&token).await.expect("valid session");
+        assert_eq!(id.id, "user-uuid");
+        assert_eq!(id.handle, "ana");
+        assert!(!id.guest);
+        assert!(id.email_verified);
+        // Wrong audience is rejected.
+        let bad = AccountsClaims {
+            aud: "other".into(),
+            ..claims
+        };
+        let token =
+            jsonwebtoken::encode(&header, &bad, &EncodingKey::from_ed_der(pkcs8.as_ref())).unwrap();
+        assert_eq!(auth.verify(&token).await.unwrap_err(), "invalid_session");
+    }
+
+    #[tokio::test]
+    async fn guest_tokens_round_trip_and_reject_tampering() {
+        let auth = Auth::new(&cfg());
+        let (token, id) = auth.guest_token("Enrique");
+        let back = auth.verify(&token).await.unwrap();
+        assert_eq!(back.id, id.id);
+        assert!(back.guest);
+        let other = Auth::new(&Config {
+            guest_signing_key: "different".into(),
+            ..cfg()
+        });
+        assert!(other.verify(&token).await.is_err());
+    }
 }
