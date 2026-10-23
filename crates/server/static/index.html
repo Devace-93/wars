@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wars — an age-advancing real-time strategy game</title>
+<meta name="description" content="Open-source real-time strategy in the spirit of the classic age-advancing RTS: 13 civilisations, four ages, random maps, scenario editor, computer players and online multiplayer. Desktop, console, Android and iOS.">
+<style>
+  :root { --bg:#181209; --panel:#3a2a1a; --border:#785a32; --accent:#f59e0b; --accent2:#b45309; --text:#f5ebd7; --dim:#aa9678; }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         background-image: linear-gradient(45deg, rgba(245,158,11,.05) 25%, transparent 25%, transparent 75%, rgba(245,158,11,.05) 75%), linear-gradient(-45deg, rgba(245,158,11,.05) 25%, transparent 25%, transparent 75%, rgba(245,158,11,.05) 75%);
+         background-size: 64px 32px; }
+  main { max-width: 960px; margin: 0 auto; padding: 48px 16px 64px }
+  h1 { font-size: 56px; letter-spacing: .08em; margin: 0; color: var(--accent); text-shadow: 2px 2px 0 #000 }
+  .tag { color: var(--dim); margin: 4px 0 32px }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px }
+  .card { background: var(--panel); border: 2px solid var(--border); padding: 18px 20px; border-radius: 4px }
+  .card h2 { margin: 0 0 8px; font-size: 20px; color: var(--accent) }
+  .card p { margin: 0 0 10px; color: var(--text) }
+  .card small, .foot { color: var(--dim) }
+  a { color: var(--accent) }
+  .btn { display:inline-block; background: var(--accent2); color:#fff; text-decoration:none; padding: 8px 14px; border-radius: 3px; border: 1px solid var(--border); margin: 4px 6px 4px 0 }
+  .btn:hover { background: var(--accent); color:#000 }
+  code { background:#241a10; padding: 2px 6px; border-radius: 3px; color: var(--text) }
+  .status { margin: 24px 0; padding: 12px 16px; background:#241a10; border-left: 4px solid var(--accent) }
+  .foot { margin-top: 40px; font-size: 14px }
+</style>
+</head>
+<body>
+<main>
+  <h1>WARS</h1>
+  <p class="tag">an open-source age-advancing real-time strategy game · 13 civilisations · 4 ages · random maps · scenario editor · computer players · online multiplayer</p>
+
+  <div class="status" id="status">Server online. <span id="live"></span></div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Desktop</h2>
+      <p>Windows, Linux and macOS builds (zip with <code>wars</code>, the console client <code>wars-tui</code> and the server).</p>
+      <a class="btn" href="https://github.com/Devace-93/wars/releases/latest">Download</a>
+      <small>Or build it: <code>cargo run --release -p wars-desktop</code></small>
+    </div>
+    <div class="card">
+      <h2>Android</h2>
+      <p>Debug APK, sideload it (allow installs from your browser or file manager).</p>
+      <a class="btn" href="https://github.com/Devace-93/wars/releases/latest">Download APK</a>
+      <small>Tap selects · drag box-selects · long press acts · two fingers pan · pinch zooms.</small>
+    </div>
+    <div class="card">
+      <h2>iPhone / iPad</h2>
+      <p>Unsigned IPA; install it with Sideloader or Sideloadly and a free Apple ID.</p>
+      <a class="btn" href="https://github.com/Devace-93/wars/releases/latest">Download IPA</a>
+      <small>Not on the App Store.</small>
+    </div>
+    <div class="card">
+      <h2>Console</h2>
+      <p>A terminal client with an action list and keyboard shortcuts for everything.</p>
+      <small><code>wars-tui</code> is in every desktop download.</small>
+    </div>
+    <div class="card">
+      <h2>Play online</h2>
+      <p>Multiplayer → play as a guest or log in with your <a href="https://accounts.3m4.net">3m4 account</a> → create a game and share the room code. Games run in lockstep on this server.</p>
+      <small>Accounts keep saves, replays and a place on the ladder.</small>
+    </div>
+    <div class="card">
+      <h2>Source</h2>
+      <p>Everything is MIT-licensed Rust: one deterministic engine shared by all the clients.</p>
+      <a class="btn" href="https://github.com/Devace-93/wars">GitHub</a>
+      <small>Issues and pull requests welcome.</small>
+    </div>
+  </div>
+
+  <p class="foot">Built by Enrique Magallón · <a href="https://info.3m4.net">more 3m4 apps</a> · API: <code>/api/healthz</code>, <code>/api/civs</code>, <code>/api/leaderboard</code></p>
+</main>
+<script>
+  Promise.all([fetch('/api/lobbies').then(r => r.json()), fetch('/api/leaderboard').then(r => r.json())])
+    .then(([lobbies, ladder]) => {
+      document.getElementById('live').textContent = `${lobbies.length} public game${lobbies.length === 1 ? '' : 's'} waiting · ${ladder.length} player${ladder.length === 1 ? '' : 's'} on the ladder.`;
+    }).catch(() => {});
+</script>
+</body>
+</html>
