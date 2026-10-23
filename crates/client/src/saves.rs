@@ -10,6 +10,12 @@ pub fn set_data_dir(p: PathBuf) {
     let _ = OVERRIDE.set(p);
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn data_dir() -> PathBuf {
+    PathBuf::from("/wars")
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 pub fn data_dir() -> PathBuf {
     if let Some(p) = OVERRIDE.get() {
         let _ = std::fs::create_dir_all(p.join("saves"));
@@ -25,6 +31,40 @@ pub fn data_dir() -> PathBuf {
     PathBuf::from(".")
 }
 
+#[cfg(target_arch = "wasm32")]
+fn unsupported<T>() -> std::io::Result<T> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "local files are not available in the browser; use online saves",
+    ))
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn save_world(_name: &str, _world: &World) -> std::io::Result<PathBuf> {
+    unsupported()
+}
+#[cfg(target_arch = "wasm32")]
+pub fn load_world(_path: &std::path::Path) -> std::io::Result<World> {
+    unsupported()
+}
+#[cfg(target_arch = "wasm32")]
+pub fn list_saves() -> Vec<(String, PathBuf)> {
+    Vec::new()
+}
+#[cfg(target_arch = "wasm32")]
+pub fn save_scenario(_sc: &wars_mapgen::scenario::Scenario) -> std::io::Result<PathBuf> {
+    unsupported()
+}
+#[cfg(target_arch = "wasm32")]
+pub fn load_scenario(_path: &std::path::Path) -> std::io::Result<wars_mapgen::scenario::Scenario> {
+    unsupported()
+}
+#[cfg(target_arch = "wasm32")]
+pub fn list_scenarios() -> Vec<(String, PathBuf)> {
+    Vec::new()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 pub fn save_world(name: &str, world: &World) -> std::io::Result<PathBuf> {
     let path = data_dir()
         .join("saves")
@@ -33,16 +73,19 @@ pub fn save_world(name: &str, world: &World) -> std::io::Result<PathBuf> {
     Ok(path)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn load_world(path: &std::path::Path) -> std::io::Result<World> {
     let bytes = std::fs::read(path)?;
     World::from_snapshot(&bytes)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn list_saves() -> Vec<(String, PathBuf)> {
     list(data_dir().join("saves"), "wars")
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn save_scenario(sc: &wars_mapgen::scenario::Scenario) -> std::io::Result<PathBuf> {
     let path = data_dir()
         .join("scenarios")
@@ -51,16 +94,19 @@ pub fn save_scenario(sc: &wars_mapgen::scenario::Scenario) -> std::io::Result<Pa
     Ok(path)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn load_scenario(path: &std::path::Path) -> std::io::Result<wars_mapgen::scenario::Scenario> {
     let bytes = std::fs::read(path)?;
     wars_mapgen::scenario::Scenario::from_bytes(&bytes)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn list_scenarios() -> Vec<(String, PathBuf)> {
     list(data_dir().join("scenarios"), "scn")
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn list(dir: PathBuf, ext: &str) -> Vec<(String, PathBuf)> {
     let mut v: Vec<(String, PathBuf)> = std::fs::read_dir(dir)
         .map(|rd| {
@@ -102,6 +148,7 @@ pub fn sanitize(name: &str) -> String {
 }
 
 /// Simple key/value settings (JSON) for hotkeys, server URL, last login.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn load_settings() -> serde_json::Value {
     let p = data_dir().join("settings.json");
     std::fs::read_to_string(p)
@@ -110,7 +157,28 @@ pub fn load_settings() -> serde_json::Value {
         .unwrap_or(serde_json::json!({}))
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn save_settings(v: &serde_json::Value) {
     let p = data_dir().join("settings.json");
     let _ = std::fs::write(p, serde_json::to_string_pretty(v).unwrap_or_default());
+}
+
+/// On the web, settings live in localStorage.
+#[cfg(target_arch = "wasm32")]
+pub fn load_settings() -> serde_json::Value {
+    web_sys::window()
+        .and_then(|w| w.local_storage().ok().flatten())
+        .and_then(|s| s.get_item("wars.settings").ok().flatten())
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or(serde_json::json!({}))
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn save_settings(v: &serde_json::Value) {
+    if let Some(s) = web_sys::window().and_then(|w| w.local_storage().ok().flatten()) {
+        let _ = s.set_item(
+            "wars.settings",
+            &serde_json::to_string(v).unwrap_or_default(),
+        );
+    }
 }

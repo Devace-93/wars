@@ -10,8 +10,9 @@ workspace = true
 
 [features]
 default = []
-# Blocking WebSocket + HTTP transport for desktop/console (std threads).
-net = ["dep:tungstenite", "dep:ureq", "dep:url"]
+# Networking: blocking WebSocket + HTTP on std threads (native) or web-sys fetch +
+# WebSocket (wasm32). Both expose the same non-blocking `Deferred` API.
+net = []
 
 [dependencies]
 wars-sim = { path = "../sim" }
@@ -22,7 +23,14 @@ wars-ai = { path = "../ai" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 postcard = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 directories = { workspace = true }
-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"], optional = true }
-ureq = { version = "2", features = ["json"], optional = true }
-url = { version = "2", optional = true }
+tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+ureq = { version = "2", features = ["json"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["Window", "Storage", "WebSocket", "MessageEvent", "BinaryType", "Event", "CloseEvent", "Request", "RequestInit", "RequestCredentials", "RequestMode", "Response", "Headers", "Location"] }

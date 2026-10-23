@@ -31,6 +31,8 @@ procedurally from shapes; there are no bitmap assets.
 - Computer players at three levels.
 - Online lobbies with room codes, host controls, chat, saves, replays and a ladder,
   signed in with your 3m4 account or as a guest.
+- Play in the browser at `/play/`: single player needs no server or account (the sim
+  runs in the page), multiplayer joins as a guest, the scenario editor needs an account.
 - The classic HUD with grid hotkeys (`Q W E R T / A S D F G / Z X C V B`), `H` town
   centre, `.` idle villager, control groups, box select, double-click select type.
 
@@ -47,6 +49,7 @@ crates/render   wgpu renderer, text, isometric camera, procedural art
 crates/ui       immediate-mode widgets
 crates/app      every screen and the in-game HUD (shared by desktop and mobile)
 crates/desktop  winit shell            crates/tui  console client
+crates/web      browser shell (wasm-bindgen + WebGL2/WebGPU, served at /play/)
 crates/server   axum server            crates/ffi  C ABI + JNI bridge for mobile
 apps/android    Kotlin shell           apps/ios    SwiftUI shell + XcodeGen spec
 docs/           DESIGN.md, CONTRACT.md, MORNING.md, research/
@@ -56,6 +59,7 @@ docs/           DESIGN.md, CONTRACT.md, MORNING.md, research/
 
 ```bash
 ./scripts/check.sh      # fmt + clippy -D warnings + tests (CI runs the same)
+./scripts/build-web.sh  # browser client into apps/web/pkg (needs wasm32 target + wasm-bindgen-cli 0.2.129)
 make db && make server  # Postgres in docker, server from source
 cargo run -p wars-mapgen --example ascii -- arabia 7   # print a map
 cargo run -p wars-ai --example botmatch                 # headless AI vs AI
