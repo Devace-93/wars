@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Wars — play</title>
+<meta name="description" content="Play Wars in the browser: single player against the computer, or online as a guest.">
+<style>
+  html, body { margin:0; height:100%; background:#181209; overflow:hidden; touch-action:none; overscroll-behavior:none }
+  canvas { display:block; width:100vw; height:100vh; outline:none }
+  #loading { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#f5ebd7; font: 16px system-ui, sans-serif; background:#181209 }
+  #loading b { color:#f59e0b; font-size: 40px; letter-spacing:.08em }
+  #kb { position:fixed; left:-1000px; top:0; opacity:0; width:1px; height:1px }
+</style>
+</head>
+<body>
+<div id="loading"><b>WARS</b><span id="msg">Loading the engine (about 10 MB)…</span></div>
+<canvas id="game"></canvas>
+<input id="kb" autocomplete="off" autocapitalize="off" autocorrect="off">
+<script type="module">
+  // The query string is the build stamp: the server replaces it on each release so
+  // browsers never run a stale module against a new server.
+  import init, { start } from './pkg/wars_web.js?v=__BUILD__';
+  const msg = document.getElementById('msg');
+  try {
+    await init({ module_or_path: './pkg/wars_web_bg.wasm?v=__BUILD__' });
+    // Prefer WebGPU when the browser really has an adapter; otherwise WebGL2.
+    let webgpu = false;
+    try { webgpu = !!(navigator.gpu && await navigator.gpu.requestAdapter()); } catch (e) { webgpu = false; }
+    await start('game', webgpu);
+    document.getElementById('loading').remove();
+  } catch (e) {
+    msg.textContent = 'Could not start: ' + e + ' — this browser needs WebGL2 or WebGPU.';
+    console.error(e);
+  }
+</script>
+</body>
+</html>

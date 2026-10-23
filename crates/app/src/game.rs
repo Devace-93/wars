@@ -177,7 +177,10 @@ pub fn frame(app: &mut App) {
     draw_world(app);
     // 4. HUD (consumes clicks over panels), then map interaction with what is left.
     crate::hud::draw_and_handle(app);
-    let g = app.game.as_mut().unwrap();
+    // The menu may have quit to the main screen: the game is gone.
+    let Some(g) = app.game.as_mut() else {
+        return;
+    };
     if g.session.world().game_over && !g.show_scores {
         g.show_scores = true;
         let w = g.session.world();

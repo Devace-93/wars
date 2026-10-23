@@ -7,12 +7,17 @@
 //! - `net` (feature): blocking WebSocket/HTTP transport and accounts login.
 
 pub mod controller;
-#[cfg(feature = "net")]
+pub mod deferred;
+#[cfg(all(feature = "net", not(target_arch = "wasm32")))]
+pub mod net;
+#[cfg(all(feature = "net", target_arch = "wasm32"))]
+#[path = "web_net.rs"]
 pub mod net;
 pub mod saves;
 pub mod session;
 
 pub use controller::Controller;
+pub use deferred::Deferred;
 pub use session::{LocalMatch, RemoteMatch, Session, Transport};
 pub use wars_ai;
 pub use wars_data;

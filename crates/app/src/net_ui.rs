@@ -3,10 +3,12 @@
 
 use crate::game::GameState;
 use crate::{App, Screen};
-use wars_client::net::{accounts_login, accounts_refresh, guest_token, ws_url, WsTransport};
+use wars_client::net::{self, ws_url};
+use wars_client::Deferred;
 use wars_client::{RemoteMatch, Session, Transport};
 use wars_mapgen::{MapSize, MapType};
 use wars_proto::*;
+use wars_proto::{LobbySummary, PlayerInfo, TokenResponse};
 use wars_sim::ids::Age;
 use wars_sim::world::{GameMode, Settings, VictoryMode, World};
 use wars_ui::{Key, Rect, Ui, THEME};
@@ -19,13 +21,25 @@ pub enum Stage {
     Room,
 }
 
+/// An in-flight network operation the screens poll every frame.
+pub enum PendingOp {
+    Guest(Deferred<Result<TokenResponse, String>>),
+    Login(Deferred<Result<(String, String), String>>),
+    Refresh(Deferred<Result<(String, String), String>>),
+    Connect(Deferred<Result<Box<dyn Transport>, String>>),
+    Lobbies(Deferred<Result<Vec<LobbySummary>, String>>),
+    Me(Deferred<Result<Option<PlayerInfo>, String>>),
+}
+
 #[derive(Default)]
 pub struct NetState {
     pub stage: Stage,
     pub token: Option<String>,
     pub refresh: Option<String>,
     pub me: Option<PlayerInfo>,
-    pub transport: Option<WsTransport>,
+    pub transport: Option<Box<dyn Transport>>,
+    pub busy_op: Option<PendingOp>,
+    pub checked_cookie: bool,
     pub lobby: Option<Lobby>,
     pub lobbies: Vec<LobbySummary>,
     pub lobby_sel: Option<usize>,
@@ -93,7 +107,7 @@ fn poll(app: &mut App) {
         match World::from_snapshot(&snapshot) {
             Ok(world) => {
                 let transport = app.net.transport.take().unwrap();
-                let rm = RemoteMatch::new(world, you, lobby, tick_rate, Box::new(transport));
+                let rm = RemoteMatch::new(world, you, lobby, tick_rate, transport);
                 app.game = Some(GameState::new(
                     Session::Remote(rm),
                     app.screen_w,
@@ -109,33 +123,92 @@ fn poll(app: &mut App) {
     }
 }
 
+fn server_url(app: &App) -> String {
+    // In the browser the game is served by the server it talks to.
+    net::same_origin_server().unwrap_or_else(|| app.menu.server_url.clone())
+}
+
 fn connect(app: &mut App) {
-    let server = app.menu.server_url.clone();
-    let Some(token) = app.net.token.clone() else {
-        return;
-    };
-    match WsTransport::connect(&ws_url(&server), &token) {
-        Ok(t) => {
-            app.net.transport = Some(t);
-            app.net.stage = Stage::List;
-            app.net.error = None;
-            refresh_list(app);
-        }
-        Err(e) => app.net.error = Some(format!("Cannot connect: {e}")),
-    }
+    let server = server_url(app);
+    let token = app.net.token.clone().unwrap_or_default();
+    app.net.busy = Some("Connecting...".into());
+    app.net.busy_op = Some(PendingOp::Connect(net::connect_deferred(
+        ws_url(&server),
+        token,
+    )));
 }
 
 fn refresh_list(app: &mut App) {
-    let server = app.menu.server_url.clone();
-    match wars_client::net::get_json::<Vec<LobbySummary>>(
-        &server,
-        "/api/lobbies",
-        app.net.token.as_deref().unwrap_or(""),
-    ) {
-        Ok(l) => app.net.lobbies = l,
-        Err(e) => app.net.error = Some(e),
+    if app.net.busy_op.is_some() {
+        return;
     }
+    let server = server_url(app);
+    let token = app.net.token.clone().unwrap_or_default();
+    app.net.busy_op = Some(PendingOp::Lobbies(net::lobbies_deferred(server, token)));
     app.net.last_refresh = app.time;
+}
+
+/// Advance whatever network call is in flight.
+fn poll_pending(app: &mut App) {
+    let Some(op) = app.net.busy_op.as_mut() else {
+        return;
+    };
+    let done: Option<Result<(), String>> = match op {
+        PendingOp::Guest(d) => d.try_take().map(|r| {
+            r.map(|t| {
+                app.net.token = Some(t.token);
+                app.net.me = Some(t.player);
+            })
+        }),
+        PendingOp::Login(d) | PendingOp::Refresh(d) => d.try_take().map(|r| {
+            r.map(|(jwt, refresh)| {
+                app.net.token = Some(jwt);
+                app.net.refresh = Some(refresh.clone());
+                app.settings["refresh"] = serde_json::Value::String(refresh);
+                app.settings["email"] = serde_json::Value::String(app.net.email.clone());
+                wars_client::saves::save_settings(&app.settings);
+                app.net.password.clear();
+            })
+        }),
+        PendingOp::Connect(d) => d.try_take().map(|r| {
+            r.map(|t| {
+                app.net.transport = Some(t);
+                app.net.stage = Stage::List;
+                app.net.error = None;
+            })
+        }),
+        PendingOp::Lobbies(d) => d.try_take().map(|r| r.map(|l| app.net.lobbies = l)),
+        PendingOp::Me(d) => d.try_take().map(|r| {
+            r.map(|me| {
+                if let Some(p) = me {
+                    // A cookie session: connect with an empty token, the server reads the cookie.
+                    app.net.me = Some(p);
+                    app.net.token = Some(String::new());
+                }
+            })
+        }),
+    };
+    if let Some(result) = done {
+        let was = app.net.busy_op.take();
+        app.net.busy = None;
+        match (was, result) {
+            (_, Err(e)) => app.net.error = Some(e),
+            (
+                Some(PendingOp::Guest(_)) | Some(PendingOp::Login(_)) | Some(PendingOp::Refresh(_)),
+                Ok(()),
+            ) => {
+                crate::menus::save_settings(app);
+                connect(app);
+            }
+            (Some(PendingOp::Me(_)), Ok(())) => {
+                if app.net.token.is_some() {
+                    connect(app);
+                }
+            }
+            (Some(PendingOp::Connect(_)), Ok(())) => refresh_list(app),
+            _ => {}
+        }
+    }
 }
 
 fn send(app: &mut App, m: ClientMsg) {
@@ -145,11 +218,26 @@ fn send(app: &mut App, m: ClientMsg) {
 }
 
 pub fn frame(app: &mut App) {
+    poll_pending(app);
     poll(app);
     if app.screen != Screen::Multiplayer {
         return;
     }
+    if net::WEB
+        && !app.net.checked_cookie
+        && app.net.busy_op.is_none()
+        && app.net.transport.is_none()
+    {
+        // The browser may already hold a 3m4 session cookie (after the login redirect).
+        app.net.checked_cookie = true;
+        app.net.busy = Some("Checking your session...".into());
+        app.net.busy_op = Some(PendingOp::Me(net::me_deferred(
+            server_url(app),
+            String::new(),
+        )));
+    }
     let (w, h) = (app.screen_w, app.screen_h);
+    let busy_now = app.net.busy_op.is_some();
     let data = app.data;
     let mut action: Option<&'static str> = None;
     let mut slot_change: Option<(usize, SlotChange)> = None;
@@ -172,11 +260,14 @@ pub fn frame(app: &mut App) {
                 ui.heading(40.0, 30.0, "Multiplayer");
                 let cw = (w - 120.0).min(520.0);
                 let mut y = 80.0;
-                ui.label_dim(
-                    40.0,
-                    y,
-                    &format!("Server: {}  (change in Options)", menu.server_url),
-                );
+                let shown_server =
+                    net::same_origin_server().unwrap_or_else(|| menu.server_url.clone());
+                let hint = if net::WEB {
+                    ""
+                } else {
+                    "  (change in Options)"
+                };
+                ui.label_dim(40.0, y, &format!("Server: {shown_server}{hint}"));
                 y += 30.0;
                 ui.text_field(
                     wars_ui::id("nick"),
@@ -190,46 +281,59 @@ pub fn frame(app: &mut App) {
                 if ui.button_styled(
                     Rect::new(40.0, y, 200.0, 36.0),
                     "Play as guest",
-                    true,
+                    !busy_now,
                     THEME.accent_dark,
                 ) {
                     action = Some("guest");
                 }
                 y += 60.0;
-                ui.label_dim(
-                    40.0,
-                    y,
-                    "Or log in with your 3m4 account (email + password):",
-                );
-                y += 26.0;
-                ui.text_field(
-                    wars_ui::id("email"),
-                    Rect::new(40.0, y, cw, 30.0),
-                    "Email",
-                    &mut net.email,
-                    "you@example.com",
-                    false,
-                );
-                y += 36.0;
-                ui.text_field(
-                    wars_ui::id("pw"),
-                    Rect::new(40.0, y, cw, 30.0),
-                    "Password",
-                    &mut net.password,
-                    "",
-                    true,
-                );
-                y += 36.0;
-                if ui.button(Rect::new(40.0, y, 200.0, 36.0), "Log in") {
-                    action = Some("login");
-                }
-                if net.refresh.is_some()
-                    && ui.button(
-                        Rect::new(260.0, y, 220.0, 36.0),
-                        "Continue previous session",
-                    )
-                {
-                    action = Some("refresh");
+                if net::WEB {
+                    ui.label_dim(40.0, y, "Or log in with your 3m4 account (needed for online saves and the scenario editor):");
+                    y += 26.0;
+                    if ui.button(Rect::new(40.0, y, 260.0, 36.0), "Log in with 3m4 account") {
+                        action = Some("login_redirect");
+                    }
+                } else {
+                    ui.label_dim(
+                        40.0,
+                        y,
+                        "Or log in with your 3m4 account (email + password):",
+                    );
+                    y += 26.0;
+                    ui.text_field(
+                        wars_ui::id("email"),
+                        Rect::new(40.0, y, cw, 30.0),
+                        "Email",
+                        &mut net.email,
+                        "you@example.com",
+                        false,
+                    );
+                    y += 36.0;
+                    ui.text_field(
+                        wars_ui::id("pw"),
+                        Rect::new(40.0, y, cw, 30.0),
+                        "Password",
+                        &mut net.password,
+                        "",
+                        true,
+                    );
+                    y += 36.0;
+                    if ui.button_styled(
+                        Rect::new(40.0, y, 200.0, 36.0),
+                        "Log in",
+                        !busy_now,
+                        THEME.button,
+                    ) {
+                        action = Some("login");
+                    }
+                    if net.refresh.is_some()
+                        && ui.button(
+                            Rect::new(260.0, y, 220.0, 36.0),
+                            "Continue previous session",
+                        )
+                    {
+                        action = Some("refresh");
+                    }
                 }
                 y += 50.0;
                 if ui.button(Rect::new(40.0, y, 120.0, 36.0), "Back") {
@@ -643,55 +747,48 @@ pub fn frame(app: &mut App) {
     }
     match action {
         Some("back") => app.screen = Screen::Main,
-        Some("guest") => {
+        Some("guest") if app.net.busy_op.is_none() => {
             let nick = if app.menu.nickname.trim().is_empty() {
                 "Guest".to_string()
             } else {
                 app.menu.nickname.clone()
             };
-            match guest_token(&app.menu.server_url, &nick) {
-                Ok(t) => {
-                    app.net.token = Some(t.token);
-                    app.net.me = Some(t.player);
-                    crate::menus::save_settings(app);
-                    connect(app);
-                }
-                Err(e) => app.net.error = Some(format!("Guest login failed: {e}")),
-            }
+            app.net.error = None;
+            app.net.busy = Some("Getting a guest pass...".into());
+            app.net.busy_op = Some(PendingOp::Guest(net::guest_token_deferred(
+                server_url(app),
+                nick,
+            )));
         }
-        Some("login") => match accounts_login(
-            &app.menu.accounts_url,
-            app.net.email.trim(),
-            &app.net.password,
-        ) {
-            Ok((jwt, refresh)) => {
-                app.net.token = Some(jwt);
-                app.net.refresh = Some(refresh.clone());
-                app.settings["refresh"] = serde_json::Value::String(refresh);
-                app.settings["email"] = serde_json::Value::String(app.net.email.clone());
-                wars_client::saves::save_settings(&app.settings);
-                app.net.password.clear();
-                connect(app);
-            }
-            Err(e) => app.net.error = Some(e),
-        },
-        Some("refresh") => {
+        Some("login") if app.net.busy_op.is_none() => {
+            app.net.error = None;
+            app.net.busy = Some("Logging in...".into());
+            app.net.busy_op = Some(PendingOp::Login(net::login_deferred(
+                app.menu.accounts_url.clone(),
+                app.net.email.trim().to_string(),
+                app.net.password.clone(),
+            )));
+        }
+        Some("login_redirect") => {
+            let here = net::same_origin_server()
+                .map(|o| format!("{o}/play/"))
+                .unwrap_or_default();
+            net::login_redirect(&app.menu.accounts_url, &here);
+        }
+        Some("refresh") if app.net.busy_op.is_none() => {
             if let Some(r) = app.net.refresh.clone() {
-                match accounts_refresh(&app.menu.accounts_url, &r) {
-                    Ok((jwt, refresh)) => {
-                        app.net.token = Some(jwt);
-                        app.net.refresh = Some(refresh.clone());
-                        app.settings["refresh"] = serde_json::Value::String(refresh);
-                        wars_client::saves::save_settings(&app.settings);
-                        connect(app);
-                    }
-                    Err(e) => app.net.error = Some(e),
-                }
+                app.net.busy = Some("Resuming your session...".into());
+                app.net.busy_op = Some(PendingOp::Refresh(net::refresh_deferred(
+                    app.menu.accounts_url.clone(),
+                    r,
+                )));
             }
         }
         Some("logout") => {
             app.net.transport = None;
             app.net.token = None;
+            app.net.me = None;
+            app.net.busy_op = None;
             app.net.stage = Stage::Login;
         }
         Some("refresh_list") => refresh_list(app),

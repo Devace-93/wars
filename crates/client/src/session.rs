@@ -11,9 +11,18 @@ use wars_sim::world::{Event, World, TICKS_PER_SECOND};
 
 /// Something that moves bytes to and from the server. Implemented by `net::WsTransport`
 /// on desktop/console and by the platform layer on mobile.
+#[cfg(not(target_arch = "wasm32"))]
 pub trait Transport: Send {
     fn send(&mut self, bytes: Vec<u8>);
     /// Non-blocking: the next complete frame, if any.
+    fn try_recv(&mut self) -> Option<Vec<u8>>;
+    fn is_closed(&self) -> bool;
+}
+
+/// Same contract on the web, where everything is single-threaded.
+#[cfg(target_arch = "wasm32")]
+pub trait Transport {
+    fn send(&mut self, bytes: Vec<u8>);
     fn try_recv(&mut self) -> Option<Vec<u8>>;
     fn is_closed(&self) -> bool;
 }
@@ -220,6 +229,12 @@ impl RemoteMatch {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn now_ms() -> u64 {
+    js_sys::Date::now() as u64
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 pub fn now_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

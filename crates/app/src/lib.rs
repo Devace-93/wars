@@ -27,6 +27,19 @@ pub enum Screen {
     Credits,
 }
 
+/// Logged in with a real 3m4 account (not a guest)? Scenarios need one.
+pub fn has_account(app: &App) -> bool {
+    #[cfg(feature = "net")]
+    {
+        app.net.me.as_ref().map(|m| !m.guest).unwrap_or(false)
+    }
+    #[cfg(not(feature = "net"))]
+    {
+        let _ = app;
+        false
+    }
+}
+
 pub struct App {
     pub data: &'static GameData,
     pub screen: Screen,

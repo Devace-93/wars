@@ -59,6 +59,7 @@ on the `edge` docker network in production), `GUEST_SIGNING_KEY`, `PUBLIC_URL`, 
 | GET | `/matches` | session | | own match history |
 | GET | `/replays/{match_id}` | – | | replay bytes (postcard `Replay`) |
 | GET | `/ws` | – | WebSocket upgrade | see below |
+| GET | `/play/` | – | the browser client (static files from `WEB_DIR`, default `web`) | – |
 
 "account" = non-guest session. Objects are defined in `crates/proto/src/lib.rs`.
 
@@ -68,7 +69,10 @@ Binary frames, each one `ClientMsg` or `ServerMsg` encoded with
 [postcard](https://docs.rs/postcard). `PROTOCOL_VERSION` = 1.
 
 1. The first client frame is `Hello { token, version }` (within 10 s). The server
-   answers `Welcome { you, server_version }` or `Error { code }` and closes.
+   answers `Welcome { you, server_version }` or `Error { code }` and closes. An empty
+   `token` means "use the upgrade request": the browser client cannot read the
+   HttpOnly `3m4_session` cookie, so the server takes the identity from the
+   `Cookie` (or `Authorization`) header of the upgrade instead.
 2. Lobby: `CreateLobby` / `JoinLobby { id | room_code }` → `LobbyState(Lobby)` on every
    change. `SetSlot { slot, change }` (civ/team/colour/ready by the seated player; AI,
    open/close, kick, by the host), `SetSource`, `SetSettings` (host), `Chat`.

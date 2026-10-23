@@ -1,0 +1,30 @@
+[package]
+name = "wars-web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wars-app = { path = "../app", features = ["net"] }
+wars-render = { path = "../render" }
+wars-ui = { path = "../ui" }
+wars-client = { path = "../client", features = ["net"] }
+wgpu = { workspace = true, features = ["webgl"] }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+console_error_panic_hook = "0.1"
+console_log = "1"
+log = "0.4"
+web-sys = { version = "0.3", features = [
+  "Window", "Document", "Element", "HtmlCanvasElement", "HtmlElement", "CssStyleDeclaration",
+  "MouseEvent", "WheelEvent", "KeyboardEvent", "TouchEvent", "TouchList", "Touch", "Event", "EventTarget",
+  "Performance", "Location", "Navigator", "DomRect", "console",
+] }

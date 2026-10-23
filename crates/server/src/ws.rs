@@ -13,18 +13,31 @@ use wars_proto::*;
 
 static NEXT_CONN: AtomicU64 = AtomicU64::new(1);
 
-pub async fn ws_handler(ws: WebSocketUpgrade, State(app): State<App>) -> Response {
+pub async fn ws_handler(
+    ws: WebSocketUpgrade,
+    State(app): State<App>,
+    headers: axum::http::HeaderMap,
+) -> Response {
+    // Browsers cannot read the HttpOnly session cookie, so they send an empty Hello
+    // token and we take the identity from the upgrade request instead.
+    let cookie_token = crate::auth::token_from_headers(&headers);
     ws.max_message_size(16 * 1024 * 1024)
-        .on_upgrade(move |socket| handle(socket, app))
+        .on_upgrade(move |socket| handle(socket, app, cookie_token))
 }
 
-async fn handle(socket: WebSocket, app: App) {
+async fn handle(socket: WebSocket, app: App, cookie_token: Option<String>) {
     let (mut sink, mut stream) = socket.split();
     // First frame must be Hello within 10 seconds.
     let hello = tokio::time::timeout(std::time::Duration::from_secs(10), stream.next()).await;
     let token = match hello {
         Ok(Some(Ok(Message::Binary(b)))) => match decode::<ClientMsg>(&b) {
-            Ok(ClientMsg::Hello { token, version }) if version == PROTOCOL_VERSION => token,
+            Ok(ClientMsg::Hello { token, version }) if version == PROTOCOL_VERSION => {
+                if token.is_empty() {
+                    cookie_token.unwrap_or_default()
+                } else {
+                    token
+                }
+            }
             Ok(ClientMsg::Hello { .. }) => {
                 let _ = sink
                     .send(Message::Binary(encode(&ServerMsg::Error {

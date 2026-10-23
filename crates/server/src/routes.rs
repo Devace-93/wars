@@ -4,7 +4,7 @@ use crate::auth::{token_from_headers, Identity};
 use crate::App;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
-use axum::response::{IntoResponse, Response};
+use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
@@ -89,6 +89,12 @@ pub fn router(app: App) -> Router {
         .route("/api/replays/:id", get(get_replay))
         .route("/api/civs", get(civs))
         .route("/ws", get(crate::ws::ws_handler))
+        .route("/play", get(play_index))
+        .route("/play/", get(play_index))
+        .nest_service(
+            "/play/pkg",
+            tower_http::services::ServeDir::new(format!("{}/pkg", web_dir())),
+        )
         .layer(cors)
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .with_state(app)
@@ -96,6 +102,31 @@ pub fn router(app: App) -> Router {
 
 async fn index() -> axum::response::Html<&'static str> {
     axum::response::Html(include_str!("../static/index.html"))
+}
+
+fn web_dir() -> String {
+    std::env::var("WEB_DIR").unwrap_or_else(|_| "web".into())
+}
+
+/// The browser client page. `__BUILD__` becomes a per-process stamp so browsers never
+/// run a cached module against a newer server.
+async fn play_index() -> Response {
+    static STAMP: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    let stamp = STAMP.get_or_init(|| {
+        let t = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        format!("{}-{t}", env!("CARGO_PKG_VERSION"))
+    });
+    match tokio::fs::read_to_string(format!("{}/index.html", web_dir())).await {
+        Ok(html) => Html(html.replace("__BUILD__", stamp)).into_response(),
+        Err(_) => (
+            StatusCode::NOT_FOUND,
+            "The browser client is not installed on this server",
+        )
+            .into_response(),
+    }
 }
 
 async fn og_image() -> Response {

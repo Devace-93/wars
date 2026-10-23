@@ -57,6 +57,16 @@ The APK was verified on an Android 14 emulator overnight (menus, setup, game scr
 Merge https://github.com/Devace-93/3m4-info/pull/14 (card status `building`); flip it to
 `live` with `https://wars.3m4.net` once the server answers.
 
+## 7b. Browser version — done (2026-10-23)
+
+`https://wars.3m4.net/play/` runs the same game as WebAssembly (WebGPU or WebGL2):
+single player needs no server or account (the simulation runs in the page), multiplayer
+joins as a guest over the same WebSocket, and the scenario editor asks for a 3m4
+account in every client (the "Log in with 3m4 account" button sends the browser to
+accounts.3m4.net and back). Local saves are not available in the browser yet; online
+saves need an account. The web client is built in the Docker image (`deploy/Dockerfile`)
+and served from `WEB_DIR`.
+
 ## 7. Play
 
 - Desktop: `cargo run --release -p wars-desktop` (or `make desktop`). F12 takes a screenshot.

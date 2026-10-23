@@ -881,7 +881,10 @@ pub fn draw_and_handle(app: &mut App) {
     }
     // Pending point commands (attack-move, patrol, garrison) take the next map click.
     {
-        let g = app.game.as_mut().unwrap();
+        // Quitting from the menu drops the game: nothing left to do this frame.
+        let Some(g) = app.game.as_mut() else {
+            return;
+        };
         if let Some(p) = g.pending_point {
             let f = &app.frame;
             if f.right_released || f.key(Key::Escape) {

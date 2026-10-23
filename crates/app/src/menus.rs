@@ -209,6 +209,10 @@ pub fn frame(app: &mut App) {
                     ("Credits", "credits"),
                     ("Quit", "quit"),
                 ] {
+                    // A browser tab has nothing to quit.
+                    if target == "quit" && cfg!(target_arch = "wasm32") {
+                        continue;
+                    }
                     if ui.button(Rect::new(x, y, bw, 40.0), label) {
                         action = Some(target);
                     }
@@ -582,8 +586,15 @@ pub fn frame(app: &mut App) {
             }
         }
         Some("editor") => {
-            app.menu.scenarios.clear();
-            next = Some(Screen::Scenarios);
+            if crate::has_account(app) {
+                app.menu.scenarios.clear();
+                next = Some(Screen::Scenarios);
+            } else {
+                app.toast(
+                    "The scenario editor needs a 3m4 account: log in under Multiplayer first",
+                );
+                next = Some(Screen::Multiplayer);
+            }
         }
         Some("new_scenario") => {
             let size = [96, 120, 144][app.menu.editor_size % 3];

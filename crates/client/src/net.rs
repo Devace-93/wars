@@ -1,6 +1,7 @@
 //! Blocking networking for desktop and console: a WebSocket transport on a thread,
 //! REST helpers and accounts login.
 
+use crate::deferred::Deferred;
 use crate::session::Transport;
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
@@ -255,4 +256,68 @@ pub fn get_bytes(server_url: &str, path: &str, token: &str) -> Result<Vec<u8>, S
     let mut buf = Vec::new();
     std::io::Read::read_to_end(&mut resp.into_reader(), &mut buf).map_err(|e| e.to_string())?;
     Ok(buf)
+}
+
+/// True in the browser build; screens use it to pick the cookie login flow.
+pub const WEB: bool = false;
+
+/// Who the server thinks we are (bearer token), or None when not logged in.
+pub fn me(server_url: &str, token: &str) -> Result<Option<PlayerInfo>, String> {
+    #[derive(serde::Deserialize)]
+    struct Me {
+        player: PlayerInfo,
+    }
+    match get_json::<Me>(server_url, "/api/me", token) {
+        Ok(m) => Ok(Some(m.player)),
+        Err(e) if e.contains("401") => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
+// ---- Non-blocking variants (the UI polls `Deferred::try_take` every frame) ----
+
+pub fn connect_deferred(
+    ws_url: String,
+    token: String,
+) -> Deferred<Result<Box<dyn Transport>, String>> {
+    Deferred::spawn(move || {
+        WsTransport::connect(&ws_url, &token).map(|t| Box::new(t) as Box<dyn Transport>)
+    })
+}
+pub fn guest_token_deferred(
+    server_url: String,
+    nickname: String,
+) -> Deferred<Result<TokenResponse, String>> {
+    Deferred::spawn(move || guest_token(&server_url, &nickname))
+}
+pub fn login_deferred(
+    accounts_url: String,
+    email: String,
+    password: String,
+) -> Deferred<Result<(String, String), String>> {
+    Deferred::spawn(move || accounts_login(&accounts_url, &email, &password))
+}
+pub fn refresh_deferred(
+    accounts_url: String,
+    refresh: String,
+) -> Deferred<Result<(String, String), String>> {
+    Deferred::spawn(move || accounts_refresh(&accounts_url, &refresh))
+}
+pub fn lobbies_deferred(
+    server_url: String,
+    token: String,
+) -> Deferred<Result<Vec<LobbySummary>, String>> {
+    Deferred::spawn(move || get_json::<Vec<LobbySummary>>(&server_url, "/api/lobbies", &token))
+}
+pub fn me_deferred(
+    server_url: String,
+    token: String,
+) -> Deferred<Result<Option<PlayerInfo>, String>> {
+    Deferred::spawn(move || me(&server_url, &token))
+}
+/// Browser-only: send the user to the hosted login page. No-op natively.
+pub fn login_redirect(_accounts_url: &str, _return_to: &str) {}
+/// Browser-only: the page's own origin (the server). None natively.
+pub fn same_origin_server() -> Option<String> {
+    None
 }
