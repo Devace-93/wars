@@ -1,9 +1,15 @@
-# Morning checklist (2026-10-21)
+# Morning checklist (2026-10-21) — status 2026-10-23
 
 Everything below needs you (SSH access, Apple ID, Bluehost login or the phone cable).
 Each item is independent; order is a suggestion.
 
-## 1. Server on the Hetzner box (10 minutes)
+## 1. Server on the Hetzner box — done
+
+`https://wars.3m4.net` is live (deployed by the `deploy` workflow once the DEPLOY_*
+secrets were set on 2026-10-22; 3m4 PR #15 merged). Verified on 2026-10-23 with
+`cargo run -p wars-client --features net --example smoke -- https://wars.3m4.net`:
+two guests, a lobby, an AI, 100 lockstep ticks with matching hashes. Still to confirm
+on the box: the nightly backup cron line below.
 
 ```bash
 ssh root@46.225.62.18
@@ -21,14 +27,14 @@ Check: `curl https://wars.3m4.net/healthz` → `{"status":"ok"}` (after DNS belo
 `wars.3m4.net` A → `46.225.62.18` (TTL 15 min) was added on 2026-10-21 and already
 answers from ns1/ns2.bluehost.com and Google DNS. Nothing to do.
 
-## 3. Deploy on push (optional, 3 minutes)
+## 3. Deploy on push — done (secrets + DEPLOY_ENABLED set 2026-10-22)
 
 Repository settings → Secrets: `DEPLOY_HOST` = `46.225.62.18`, `DEPLOY_USER` = `root`,
 `DEPLOY_KEY` = a private ed25519 key whose public half is in the server's
 `authorized_keys`; Variables: `DEPLOY_ENABLED` = `true`. From then on every merge to
 `main` redeploys through `.github/workflows/deploy.yml`.
 
-## 4. Phone (1 minute)
+## 4. Phone — done (installed and verified on the Xiaomi 2026-10-21)
 
 Plug the Xiaomi back in with USB debugging on and tell me "install the APK" (or run
 `make android` then `adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk`).
@@ -46,7 +52,7 @@ The APK was verified on an Android 14 emulator overnight (menus, setup, game scr
    `.ipa`. Free accounts re-sign every 7 days.
 3. On the iPhone: Settings → General → VPN & Device Management → trust the profile.
 
-## 6. Info site
+## 6. Info site — PR #14 now says `live`; merge it
 
 Merge https://github.com/Devace-93/3m4-info/pull/14 (card status `building`); flip it to
 `live` with `https://wars.3m4.net` once the server answers.
