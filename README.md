@@ -59,6 +59,7 @@ docs/           DESIGN.md, CONTRACT.md, MORNING.md, research/
 make db && make server  # Postgres in docker, server from source
 cargo run -p wars-mapgen --example ascii -- arabia 7   # print a map
 cargo run -p wars-ai --example botmatch                 # headless AI vs AI
+cargo run -p wars-client --features net --example smoke  # 2 guests + AI vs the live server
 ```
 
 Rules for contributors are in `CLAUDE.md`; the game rules in `docs/DESIGN.md`; the
