@@ -71,6 +71,7 @@ pub fn router(app: App) -> Router {
         ]);
     Router::new()
         .route("/", get(index))
+        .route("/og-image.png", get(og_image))
         .route("/healthz", get(healthz))
         .route("/api/healthz", get(healthz))
         .route("/api/guest", post(guest))
@@ -95,6 +96,17 @@ pub fn router(app: App) -> Router {
 
 async fn index() -> axum::response::Html<&'static str> {
     axum::response::Html(include_str!("../static/index.html"))
+}
+
+async fn og_image() -> Response {
+    (
+        [
+            (axum::http::header::CONTENT_TYPE, "image/png"),
+            (axum::http::header::CACHE_CONTROL, "public, max-age=86400"),
+        ],
+        include_bytes!("../static/og-image.png").as_slice(),
+    )
+        .into_response()
 }
 
 async fn healthz() -> Json<serde_json::Value> {
