@@ -34,5 +34,7 @@ sha2 = "0.10"
 hmac = "0.12"
 
 [dev-dependencies]
+ring = "0.17"
+base64 = "0.22"
 wars-client = { path = "../client", features = ["net"] }
 ureq = { version = "2", features = ["json"] }
