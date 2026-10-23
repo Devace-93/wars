@@ -2,8 +2,11 @@ name: desktop-builds
 on:
   push:
     branches: [main]
+    tags: ["v*"]
     paths: ["crates/**", ".github/workflows/release.yml", "Cargo.*"]
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   build:
     strategy:
@@ -34,10 +37,16 @@ jobs:
           cp target/release/wars${{ matrix.ext }} dist/
           cp target/release/wars-tui${{ matrix.ext }} dist/
           cp target/release/wars-server${{ matrix.ext }} dist/
+          cd dist && 7z a -tzip ../wars-${{ matrix.name }}.zip . > /dev/null || zip -r ../wars-${{ matrix.name }}.zip .
       - uses: actions/upload-artifact@v4
         with:
           name: wars-${{ matrix.name }}
           path: dist/*
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wars-${{ matrix.name }}.zip
   android:
     runs-on: ubuntu-latest
     steps:
@@ -55,7 +64,13 @@ jobs:
       - run: cargo install cargo-ndk
       - run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018" cargo ndk -t arm64-v8a --platform 26 -o apps/android/app/src/main/jniLibs build --release -p wars-ffi
       - run: cd apps/android && ./gradlew assembleDebug
+      - run: cp apps/android/app/build/outputs/apk/debug/app-debug.apk wars-android.apk
       - uses: actions/upload-artifact@v4
         with:
           name: wars-android-debug
-          path: apps/android/app/build/outputs/apk/debug/app-debug.apk
+          path: wars-android.apk
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wars-android.apk

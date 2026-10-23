@@ -70,6 +70,7 @@ pub fn router(app: App) -> Router {
             axum::http::header::CONTENT_TYPE,
         ]);
     Router::new()
+        .route("/", get(index))
         .route("/healthz", get(healthz))
         .route("/api/healthz", get(healthz))
         .route("/api/guest", post(guest))
@@ -90,6 +91,10 @@ pub fn router(app: App) -> Router {
         .layer(cors)
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .with_state(app)
+}
+
+async fn index() -> axum::response::Html<&'static str> {
+    axum::response::Html(include_str!("../static/index.html"))
 }
 
 async fn healthz() -> Json<serde_json::Value> {
