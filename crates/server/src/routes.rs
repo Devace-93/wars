@@ -71,6 +71,7 @@ pub fn router(app: App) -> Router {
         ]);
     Router::new()
         .route("/", get(index))
+        .route("/api/play", get(play_status))
         .route("/og-image.png", get(og_image))
         .route("/healthz", get(healthz))
         .route("/api/healthz", get(healthz))
@@ -100,8 +101,57 @@ pub fn router(app: App) -> Router {
         .with_state(app)
 }
 
-async fn index() -> axum::response::Html<&'static str> {
-    axum::response::Html(include_str!("../static/index.html"))
+/// Who is looking, for the browser-beta flag: account id and handle when the request
+/// carries a valid session (cookie or bearer), nothing for guests and visitors.
+async fn viewer(app: &App, headers: &HeaderMap) -> crate::flags::Viewer {
+    let Some(token) = token_from_headers(headers) else {
+        return crate::flags::Viewer::default();
+    };
+    match app.auth.verify(&token).await {
+        Ok(id) if !id.guest => crate::flags::Viewer {
+            distinct_id: Some(id.id.clone()),
+            handle: Some(id.handle.clone()),
+        },
+        _ => crate::flags::Viewer::default(),
+    }
+}
+
+async fn play_open(app: &App, headers: &HeaderMap) -> (bool, crate::flags::Viewer) {
+    let v = viewer(app, headers).await;
+    let open = app.flags.play_access(&v).await == crate::flags::Access::Open;
+    (open, v)
+}
+
+/// `{ "enabled": bool }`: may this viewer open `/play/`?
+async fn play_status(State(app): State<App>, headers: HeaderMap) -> Json<serde_json::Value> {
+    let (open, _) = play_open(&app, &headers).await;
+    Json(json!({ "enabled": open, "beta": !app.flags.disabled() }))
+}
+
+/// Landing page. The "Play in your browser" card is only shown to viewers the
+/// `wars-play` flag lets in; everyone else sees a closed-beta note instead.
+async fn index(State(app): State<App>, headers: HeaderMap) -> Html<String> {
+    const PAGE: &str = include_str!("../static/index.html");
+    let (open, _) = play_open(&app, &headers).await;
+    Html(render_index(PAGE, open))
+}
+
+fn render_index(page: &str, play_open: bool) -> String {
+    const START: &str = "<!--PLAY_CARD_START-->";
+    const END: &str = "<!--PLAY_CARD_END-->";
+    if play_open {
+        return page.replace(START, "").replace(END, "");
+    }
+    match (page.find(START), page.find(END)) {
+        (Some(a), Some(b)) if b > a => {
+            let note = r#"<div class="card">
+      <h2>Browser version: closed beta</h2>
+      <p>The in-browser build is being finished and is open to testers only for now. <a href="/play/">Testers log in here</a>.</p>
+    </div>"#;
+            format!("{}{}{}", &page[..a], note, &page[b + END.len()..])
+        }
+        _ => page.to_string(),
+    }
 }
 
 fn web_dir() -> String {
@@ -110,7 +160,11 @@ fn web_dir() -> String {
 
 /// The browser client page. `__BUILD__` becomes a per-process stamp so browsers never
 /// run a cached module against a newer server.
-async fn play_index() -> Response {
+async fn play_index(State(app): State<App>, headers: HeaderMap) -> Response {
+    let (open, v) = play_open(&app, &headers).await;
+    if !open {
+        return beta_page(&app, &v);
+    }
     static STAMP: std::sync::OnceLock<String> = std::sync::OnceLock::new();
     let stamp = STAMP.get_or_init(|| {
         let t = std::time::SystemTime::now()
@@ -127,6 +181,63 @@ async fn play_index() -> Response {
         )
             .into_response(),
     }
+}
+
+/// The closed-beta page: explains the state and offers the login that may unlock it.
+fn beta_page(app: &App, v: &crate::flags::Viewer) -> Response {
+    const PAGE: &str = include_str!("../static/beta.html");
+    let return_to = format!("{}/play/", app.cfg.public_url.trim_end_matches('/'));
+    let login = format!(
+        "{}/login?return_to={}",
+        app.cfg.accounts_url.trim_end_matches('/'),
+        percent_encode(&return_to)
+    );
+    let (message, actions) = match &v.handle {
+        Some(h) => (
+            format!(
+                "Hi <b>{}</b>. The browser version is not open to everyone yet, and your account is not on the testers list. \
+                 Ask to be added, or come back when the beta opens.",
+                html_escape(h)
+            ),
+            r#"<a class="btn" href="/">Back to the downloads</a>"#.to_string(),
+        ),
+        None => (
+            "The browser version of Wars is in a closed beta while the last rough edges are filed off. \
+             Testers can log in with their 3m4 account to play; everyone else can use the desktop, Android or console versions today."
+                .to_string(),
+            format!(r#"<a class="btn" href="{login}">Log in as a tester</a> <a class="btn" href="/">Back to the downloads</a>"#),
+        ),
+    };
+    (
+        StatusCode::OK,
+        [(axum::http::header::CACHE_CONTROL, "no-store")],
+        Html(
+            PAGE.replace("__MESSAGE__", &message)
+                .replace("__ACTIONS__", &actions),
+        ),
+    )
+        .into_response()
+}
+
+/// Minimal percent-encoding for a query value (RFC 3986 unreserved characters kept).
+fn percent_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() * 3);
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 async fn og_image() -> Response {
@@ -498,4 +609,18 @@ async fn get_replay(
         bytes,
     )
         .into_response())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::render_index;
+
+    #[test]
+    fn play_card_is_shown_or_replaced() {
+        let page = "a<!--PLAY_CARD_START--><div>card</div><!--PLAY_CARD_END-->z";
+        assert_eq!(render_index(page, true), "a<div>card</div>z");
+        let closed = render_index(page, false);
+        assert!(closed.starts_with('a') && closed.ends_with('z'));
+        assert!(!closed.contains("<div>card</div>") && closed.contains("closed beta"));
+    }
 }

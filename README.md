@@ -33,6 +33,8 @@ procedurally from shapes; there are no bitmap assets.
   signed in with your 3m4 account or as a guest.
 - Play in the browser at `/play/`: single player needs no server or account (the sim
   runs in the page), multiplayer joins as a guest, the scenario editor needs an account.
+  Operators can keep it as a closed beta behind an [exp](https://exp.3m4.net) flag
+  (`EXP_CLIENT_KEY`, flag `wars-play`, testers list `wars-play-testers`).
 - The classic HUD with grid hotkeys (`Q W E R T / A S D F G / Z X C V B`), `H` town
   centre, `.` idle villager, control groups, box select, double-click select type.
 

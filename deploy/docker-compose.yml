@@ -26,6 +26,9 @@ services:
       ACCOUNTS_INTERNAL_URL: ${ACCOUNTS_INTERNAL_URL:-https://accounts.3m4.net}
       GUEST_SIGNING_KEY: ${GUEST_SIGNING_KEY:-dev-guest-key-change-me}
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8086}
+      EXP_URL: ${EXP_URL:-https://exp.3m4.net}
+      EXP_CLIENT_KEY: ${EXP_CLIENT_KEY:-}
+      PLAY_FLAG: ${PLAY_FLAG:-wars-play}
       PORT: "8086"
       RUST_LOG: ${RUST_LOG:-info}
     ports:
