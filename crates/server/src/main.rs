@@ -2,6 +2,7 @@
 
 mod auth;
 mod db;
+mod flags;
 mod game;
 mod lobby;
 mod routes;
@@ -19,6 +20,13 @@ pub struct Config {
     pub guest_signing_key: String,
     pub public_url: String,
     pub version: String,
+    /// exp (feature flags): evaluation API base and environment client key. An
+    /// empty key means "no flags": the browser client is open to everyone.
+    pub exp_url: String,
+    pub exp_client_key: String,
+    /// Boolean flag that opens the browser beta; `<flag>-testers` (json list of
+    /// handles) lets named accounts in while it is off.
+    pub play_flag: String,
 }
 
 impl Config {
@@ -33,6 +41,9 @@ impl Config {
             guest_signing_key: env("GUEST_SIGNING_KEY", "dev-guest-key-change-me"),
             public_url: env("PUBLIC_URL", "http://localhost:8086"),
             version: env!("CARGO_PKG_VERSION").to_string(),
+            exp_url: env("EXP_URL", "https://exp.3m4.net"),
+            exp_client_key: env("EXP_CLIENT_KEY", ""),
+            play_flag: env("PLAY_FLAG", "wars-play"),
         }
     }
 }
@@ -43,6 +54,7 @@ pub struct AppState {
     pub auth: auth::Auth,
     pub lobbies: Mutex<lobby::Lobbies>,
     pub data: &'static wars_sim::types::GameData,
+    pub flags: flags::Flags,
 }
 
 pub type App = Arc<AppState>;
@@ -60,6 +72,7 @@ async fn main() -> anyhow::Result<()> {
     sqlx::migrate!("./migrations").run(&db).await?;
     let state: App = Arc::new(AppState {
         auth: auth::Auth::new(&cfg),
+        flags: flags::Flags::new(&cfg.exp_url, &cfg.exp_client_key, &cfg.play_flag),
         cfg: cfg.clone(),
         db,
         lobbies: Mutex::new(lobby::Lobbies::default()),

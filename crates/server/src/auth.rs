@@ -274,6 +274,9 @@ mod tests {
             guest_signing_key: "test-guest-key".into(),
             public_url: String::new(),
             version: "test".into(),
+            exp_url: String::new(),
+            exp_client_key: String::new(),
+            play_flag: "wars-play".into(),
         }
     }
 

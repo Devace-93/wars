@@ -59,9 +59,20 @@ on the `edge` docker network in production), `GUEST_SIGNING_KEY`, `PUBLIC_URL`, 
 | GET | `/matches` | session | | own match history |
 | GET | `/replays/{match_id}` | – | | replay bytes (postcard `Replay`) |
 | GET | `/ws` | – | WebSocket upgrade | see below |
-| GET | `/play/` | – | the browser client (static files from `WEB_DIR`, default `web`) | – |
+| GET | `/play/` | – | the browser client (static files from `WEB_DIR`, default `web`); a closed-beta page instead when the exp flag says no | – |
+| GET | `/api/play` | – | `{enabled, beta}`: may this viewer open `/play/`; `beta` is false when no `EXP_CLIENT_KEY` is set | – |
 
 "account" = non-guest session. Objects are defined in `crates/proto/src/lib.rs`.
+
+### Browser beta flag (exp)
+
+With `EXP_CLIENT_KEY` set, the server asks exp's evaluation API
+(`GET $EXP_URL/api/eval/flags?distinct_id=<account id>`, header `X-Environment-Key`)
+and lets a viewer into `/play/` when the boolean flag `$PLAY_FLAG` (default
+`wars-play`) is on for them, or when their handle is in the json flag
+`$PLAY_FLAG-testers`. Guests and anonymous visitors have no `distinct_id`, so a partial
+rollout excludes them. Answers are cached 30 s per viewer; an unreachable exp closes
+the beta for 10 s and is retried. Without a key the browser client is open to all.
 
 ## WebSocket protocol (`/ws`)
 
