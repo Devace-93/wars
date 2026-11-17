@@ -257,7 +257,10 @@ async fn og_image() -> Response {
 /// lists the one public page.
 async fn robots_txt() -> Response {
     (
-        [(axum::http::header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; charset=utf-8",
+        )],
         "User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: https://wars.3m4.net/sitemap.xml\n",
     )
         .into_response()
@@ -265,7 +268,10 @@ async fn robots_txt() -> Response {
 
 async fn sitemap_xml() -> Response {
     (
-        [(axum::http::header::CONTENT_TYPE, "application/xml; charset=utf-8")],
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "application/xml; charset=utf-8",
+        )],
         concat!(
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n",
             "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n",
