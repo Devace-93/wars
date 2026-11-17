@@ -73,6 +73,8 @@ pub fn router(app: App) -> Router {
         .route("/", get(index))
         .route("/api/play", get(play_status))
         .route("/og-image.png", get(og_image))
+        .route("/robots.txt", get(robots_txt))
+        .route("/sitemap.xml", get(sitemap_xml))
         .route("/healthz", get(healthz))
         .route("/api/healthz", get(healthz))
         .route("/api/guest", post(guest))
@@ -247,6 +249,29 @@ async fn og_image() -> Response {
             (axum::http::header::CACHE_CONTROL, "public, max-age=86400"),
         ],
         include_bytes!("../static/og-image.png").as_slice(),
+    )
+        .into_response()
+}
+
+/// For search engines: everything but the API may be read, and the sitemap
+/// lists the one public page.
+async fn robots_txt() -> Response {
+    (
+        [(axum::http::header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        "User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: https://wars.3m4.net/sitemap.xml\n",
+    )
+        .into_response()
+}
+
+async fn sitemap_xml() -> Response {
+    (
+        [(axum::http::header::CONTENT_TYPE, "application/xml; charset=utf-8")],
+        concat!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n",
+            "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n",
+            "  <url><loc>https://wars.3m4.net/</loc></url>\n",
+            "</urlset>\n",
+        ),
     )
         .into_response()
 }
