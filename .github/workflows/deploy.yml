@@ -19,4 +19,6 @@ jobs:
           echo "$DEPLOY_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
-          ssh "$DEPLOY_USER@$DEPLOY_HOST" 'bash -s' < deploy/first-deploy.sh
+          # One deploy at a time on the box: every app shares this lock, so
+          # simultaneous pushes queue up instead of building together.
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" 'flock -w 2400 /var/lock/box-deploy.lock bash -s' < deploy/first-deploy.sh
